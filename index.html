@@ -511,6 +511,10 @@
       background: rgba(10, 132, 255, 0.18);
       font-weight: 700;
     }
+    tr.open-row {
+      background: rgba(255, 255, 255, 0.15);
+      font-weight: 700;
+    }
     tr.limit-row {
       background: rgba(255, 69, 58, 0.22);
       font-weight: 700;
@@ -810,7 +814,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v18_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v19_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
@@ -1271,6 +1275,7 @@
 
       const hasLiveQuote = !!(data.quote && (data.quote.openPrice > 0 || data.quote.prevClose > 0));
       const baseStockPrice = hasLiveQuote ? (data.quote.openPrice || data.quote.prevClose) : null;
+      const actualOpenPrice = (hasLiveQuote && data.quote.openPrice > 0) ? data.quote.openPrice : null;
 
       document.getElementById('tickRangeRow').style.display = hasLiveQuote ? 'none' : 'flex';
 
@@ -1331,7 +1336,8 @@
         while (curUp < upLimit && upCount < 400) {
           curUp = stepTick(curUp, 1);
           upCount++;
-          upPrices.push({ tickOffset: `+${upCount}`, price: curUp, isLimitUp: curUp >= upLimit });
+          const isOpen = actualOpenPrice !== null && Math.abs(curUp - actualOpenPrice) < 0.0001;
+          upPrices.push({ tickOffset: `+${upCount}`, price: curUp, isLimitUp: curUp >= upLimit, isOpen: isOpen });
         }
 
         let curDown = calcPrice;
@@ -1339,33 +1345,36 @@
         while (curDown > downLimit && downCount < 400) {
           curDown = stepTick(curDown, -1);
           downCount++;
-          downPrices.push({ tickOffset: `-${downCount}`, price: curDown, isLimitDown: curDown <= downLimit });
+          const isOpen = actualOpenPrice !== null && Math.abs(curDown - actualOpenPrice) < 0.0001;
+          downPrices.push({ tickOffset: `-${downCount}`, price: curDown, isLimitDown: curDown <= downLimit, isOpen: isOpen });
         }
       } else {
         const numTicks = parseInt(document.getElementById('tickRange').value, 10);
         let curUp = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
           curUp = stepTick(curUp, 1);
-          upPrices.push({ tickOffset: `+${i}`, price: curUp });
+          upPrices.push({ tickOffset: `+${i}`, price: curUp, isOpen: false });
         }
 
         let curDown = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
           curDown = stepTick(curDown, -1);
-          downPrices.push({ tickOffset: `-${i}`, price: curDown });
+          downPrices.push({ tickOffset: `-${i}`, price: curDown, isOpen: false });
         }
       }
 
       let baseLabel = '';
+      const isBaseOpen = actualOpenPrice !== null && Math.abs(calcPrice - actualOpenPrice) < 0.0001;
       if (hasValidOrderPrice) {
         baseLabel = data.orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進');
+        if (isBaseOpen) baseLabel += ' (開盤)';
       } else {
         baseLabel = '開盤';
       }
 
       const list = [
         ...upPrices.reverse(),
-        { tickOffset: baseLabel, price: calcPrice, isBaseRow: true },
+        { tickOffset: baseLabel, price: calcPrice, isBaseRow: true, isOpen: isBaseOpen },
         ...downPrices
       ];
 
@@ -1378,6 +1387,8 @@
 
         if (item.isBaseRow) {
           tr.className = 'buy-row';
+        } else if (item.isOpen) {
+          tr.className = 'open-row';
         } else if (item.isLimitUp) {
           tr.className = 'limit-row';
         } else if (item.isLimitDown) {
@@ -1397,6 +1408,7 @@
         }
 
         let tag = item.tickOffset;
+        if (item.isOpen && !item.isBaseRow) tag += ' (開盤)';
         if (item.isLimitUp) tag += ' (漲停)';
         if (item.isLimitDown) tag += ' (跌停)';
 
@@ -1405,7 +1417,7 @@
         let roiTd = displayConfig.colRoi ? `<td class="${profitClass}">${profitSign}${res.roi}%</td>` : '';
 
         tr.innerHTML = `
-          <td class="text-center ${item.isBaseRow ? '' : 'muted-text'}">${tag}</td>
+          <td class="text-center ${item.isBaseRow || item.isOpen ? '' : 'muted-text'}">${tag}</td>
           <td><strong>${item.price.toFixed(2)}</strong></td>
           ${costTd}
           ${profitTd}
@@ -1574,7 +1586,6 @@
         tabsData[currentTab].name = `${symbol} ${name}`;
         tabsData[currentTab].quote = quoteObj;
 
-        // 手動同步或首次抓取時，若 #1 尚無價格，自動帶入當下現價
         if (isManual && tabsData[currentTab].orders.length > 0 && finalPrice > 0) {
           if (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined) {
             tabsData[currentTab].orders[0].price = finalPrice;
