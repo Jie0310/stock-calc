@@ -77,7 +77,7 @@
       justify-content: center;
     }
 
-    /* 多標的分頁籤 */
+    /* 多標的分頁列 */
     .tab-bar {
       display: flex;
       gap: 6px;
@@ -85,8 +85,11 @@
     }
     .tab-item {
       flex: 1;
-      text-align: center;
-      padding: 6px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px 4px;
       font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
@@ -95,12 +98,22 @@
       border: 1px solid transparent;
       cursor: pointer;
       transition: all 0.2s ease;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
     .tab-item.active {
       color: var(--text);
       background: var(--card-inner);
       border-color: var(--border);
       box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    }
+    .tab-edit-icon {
+      font-size: 0.7rem;
+      opacity: 0.5;
+    }
+    .tab-item.active .tab-edit-icon {
+      opacity: 0.9;
     }
 
     .segmented-control {
@@ -232,6 +245,8 @@
       background: var(--primary);
       color: #ffffff;
     }
+    
+    /* 下單列表與快捷按鈕組 */
     .order-list {
       margin-top: 8px;
       display: flex;
@@ -250,20 +265,47 @@
       font-size: 0.72rem;
       font-weight: 700;
       color: var(--text-muted);
-      width: 22px;
+      width: 16px;
       text-align: center;
     }
-    .order-input {
+    .stepper-group {
+      display: flex;
+      align-items: center;
       background: #1c1c1e;
       border: 1px solid var(--border);
-      color: var(--text);
-      padding: 6px 8px;
       border-radius: 6px;
-      font-size: 0.9rem;
+      flex: 1;
+      overflow: hidden;
+    }
+    .stepper-btn {
+      background: #2c2c2e;
+      border: none;
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 700;
+      width: 24px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .stepper-btn:active {
+      background: #3a3a3c;
+    }
+    .order-input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      padding: 4px 2px;
+      font-size: 0.88rem;
       font-weight: 600;
-      text-align: right;
+      text-align: center;
       flex: 1;
       width: 0;
+      min-width: 0;
+      -webkit-appearance: none;
     }
     .order-del-btn {
       background: rgba(255, 69, 58, 0.2);
@@ -271,7 +313,7 @@
       border: none;
       border-radius: 6px;
       width: 26px;
-      height: 26px;
+      height: 30px;
       font-weight: 700;
       cursor: pointer;
       display: flex;
@@ -430,9 +472,18 @@
 
   <!-- 多標的分頁列 -->
   <div class="tab-bar">
-    <div class="tab-item active" data-tab="0" onclick="switchTab(0)">標的 1</div>
-    <div class="tab-item" data-tab="1" onclick="switchTab(1)">標的 2</div>
-    <div class="tab-item" data-tab="2" onclick="switchTab(2)">標的 3</div>
+    <div class="tab-item active" data-tab="0" onclick="handleTabClick(0)">
+      <span id="tabName0">標的 1</span>
+      <span class="tab-edit-icon" onclick="renameTab(event, 0)">✎</span>
+    </div>
+    <div class="tab-item" data-tab="1" onclick="handleTabClick(1)">
+      <span id="tabName1">標的 2</span>
+      <span class="tab-edit-icon" onclick="renameTab(event, 1)">✎</span>
+    </div>
+    <div class="tab-item" data-tab="2" onclick="handleTabClick(2)">
+      <span id="tabName2">標的 3</span>
+      <span class="tab-edit-icon" onclick="renameTab(event, 2)">✎</span>
+    </div>
   </div>
 
   <div class="segmented-control">
@@ -540,16 +591,15 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v2_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v3_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
 
-    // 預設三個獨立的分頁資料結構
     let tabsData = [
-      { mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false },
-      { mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 50, qty: 1 }], basePrice: 50, enableBase: false },
-      { mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 200, qty: 1 }], basePrice: 200, enableBase: false }
+      { name: '標的 1', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false },
+      { name: '標的 2', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 50, qty: 1 }], basePrice: 50, enableBase: false },
+      { name: '標的 3', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 200, qty: 1 }], basePrice: 200, enableBase: false }
     ];
 
     function loadState() {
@@ -586,7 +636,7 @@
       }
     }
 
-    function switchTab(index) {
+    function handleTabClick(index) {
       currentTab = index;
       document.querySelectorAll('.tab-item').forEach((tab, i) => {
         tab.classList.toggle('active', i === currentTab);
@@ -595,15 +645,32 @@
       saveState();
     }
 
+    function renameTab(e, index) {
+      e.stopPropagation();
+      const currentName = tabsData[index].name || `標的 ${index + 1}`;
+      const newName = prompt('請輸入此標的名稱（例如：2330 台積電）：', currentName);
+      if (newName !== null && newName.trim() !== '') {
+        tabsData[index].name = newName.trim();
+        updateTabTitles();
+        saveState();
+      }
+    }
+
+    function updateTabTitles() {
+      tabsData.forEach((t, i) => {
+        const el = document.getElementById(`tabName${i}`);
+        if (el) el.innerText = t.name || `標的 ${i + 1}`;
+      });
+    }
+
     function syncUIFromCurrentTab() {
       const data = tabsData[currentTab];
-      
-      // 模式
+      updateTabTitles();
+
       document.querySelectorAll('.segment-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === data.mode);
       });
 
-      // 買賣方向列
       const dirBar = document.getElementById('directionBar');
       if (data.mode === 'daytrade') {
         dirBar.style.display = 'flex';
@@ -612,12 +679,10 @@
         data.direction = 'buy';
       }
 
-      // 開盤價
       document.getElementById('enableBasePrice').checked = data.enableBase;
       document.getElementById('basePrice').disabled = !data.enableBase;
       document.getElementById('basePrice').value = data.basePrice;
 
-      // 零股開關
       const unitSwitch = document.getElementById('unitSwitch');
       if (data.mode === 'swing') {
         unitSwitch.style.display = 'inline-flex';
@@ -650,7 +715,6 @@
 
     function setUnitType(unit) {
       tabsData[currentTab].unit = unit;
-      // 若從整張切換到零股，將預設張數轉為股數預設值
       tabsData[currentTab].orders.forEach(o => {
         if (unit === 'odd' && o.qty <= 50) o.qty = Math.round(o.qty * 1000);
         if (unit === 'lot' && o.qty >= 100) o.qty = Math.max(1, Math.round(o.qty / 1000));
@@ -680,52 +744,6 @@
       };
       document.getElementById('rateBadge').innerText = badgeMap[data.mode];
       document.getElementById('thPriceLabel').innerText = isShort ? '回補價格' : '賣出價格';
-    }
-
-    function renderOrderRows() {
-      const data = tabsData[currentTab];
-      const list = document.getElementById('orderList');
-      list.innerHTML = '';
-      
-      const isOdd = data.unit === 'odd' && data.mode === 'swing';
-      const qtyLabel = isOdd ? '股數' : '張數';
-      const qtyStep = isOdd ? '1' : 'any';
-
-      data.orders.forEach((item, idx) => {
-        const row = document.createElement('div');
-        row.className = 'order-row';
-        row.innerHTML = `
-          <span class="order-tag">#${idx + 1}</span>
-          <input type="number" class="order-input" placeholder="價格" value="${item.price}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
-          <input type="number" class="order-input" placeholder="${qtyLabel}" value="${item.qty}" step="${qtyStep}" min="${isOdd ? 1 : 0.001}" inputmode="${isOdd ? 'numeric' : 'decimal'}" oninput="updateOrder(${idx}, 'qty', this.value)">
-          ${data.orders.length > 1 ? `<button class="order-del-btn" type="button" onclick="deleteOrderRow(${idx})">×</button>` : ''}
-        `;
-        list.appendChild(row);
-      });
-    }
-
-    function addOrderRow() {
-      const data = tabsData[currentTab];
-      const last = data.orders[data.orders.length - 1] || { price: 100, qty: data.unit === 'odd' ? 100 : 1 };
-      data.orders.push({ price: last.price, qty: last.qty });
-      renderOrderRows();
-      renderTable();
-      saveState();
-    }
-
-    function deleteOrderRow(idx) {
-      const data = tabsData[currentTab];
-      if (data.orders.length <= 1) return;
-      data.orders.splice(idx, 1);
-      renderOrderRows();
-      renderTable();
-      saveState();
-    }
-
-    function updateOrder(idx, key, val) {
-      tabsData[currentTab].orders[idx][key] = parseFloat(val) || 0;
-      renderTable();
-      saveState();
     }
 
     function getTickSize(price) {
@@ -758,6 +776,84 @@
         }
         return Math.max(0.01, Math.round(nextP * 100) / 100);
       }
+    }
+
+    function stepPrice(idx, direction) {
+      const cur = tabsData[currentTab].orders[idx].price || 100;
+      const next = stepTick(cur, direction);
+      tabsData[currentTab].orders[idx].price = next;
+      renderOrderRows();
+      renderTable();
+      saveState();
+    }
+
+    function stepQty(idx, direction) {
+      const isOdd = tabsData[currentTab].unit === 'odd' && tabsData[currentTab].mode === 'swing';
+      const step = isOdd ? 100 : 1;
+      let cur = tabsData[currentTab].orders[idx].qty || (isOdd ? 100 : 1);
+      let next = cur + (direction * step);
+      if (next <= 0) next = isOdd ? 10 : 0.1;
+      tabsData[currentTab].orders[idx].qty = Math.round(next * 1000) / 1000;
+      renderOrderRows();
+      renderTable();
+      saveState();
+    }
+
+    function renderOrderRows() {
+      const data = tabsData[currentTab];
+      const list = document.getElementById('orderList');
+      list.innerHTML = '';
+      
+      const isOdd = data.unit === 'odd' && data.mode === 'swing';
+      const qtyLabel = isOdd ? '股數' : '張數';
+      const qtyStep = isOdd ? '1' : 'any';
+
+      data.orders.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'order-row';
+        row.innerHTML = `
+          <span class="order-tag">#${idx + 1}</span>
+          
+          <div class="stepper-group">
+            <button class="stepper-btn" type="button" onclick="stepPrice(${idx}, -1)">−</button>
+            <input type="number" class="order-input" placeholder="價格" value="${item.price}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
+            <button class="stepper-btn" type="button" onclick="stepPrice(${idx}, 1)">+</button>
+          </div>
+
+          <div class="stepper-group">
+            <button class="stepper-btn" type="button" onclick="stepQty(${idx}, -1)">−</button>
+            <input type="number" class="order-input" placeholder="${qtyLabel}" value="${item.qty}" step="${qtyStep}" min="${isOdd ? 1 : 0.001}" inputmode="${isOdd ? 'numeric' : 'decimal'}" oninput="updateOrder(${idx}, 'qty', this.value)">
+            <button class="stepper-btn" type="button" onclick="stepQty(${idx}, 1)">+</button>
+          </div>
+
+          ${data.orders.length > 1 ? `<button class="order-del-btn" type="button" onclick="deleteOrderRow(${idx})">×</button>` : ''}
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    function addOrderRow() {
+      const data = tabsData[currentTab];
+      const last = data.orders[data.orders.length - 1] || { price: 100, qty: data.unit === 'odd' ? 100 : 1 };
+      data.orders.push({ price: last.price, qty: last.qty });
+      renderOrderRows();
+      renderTable();
+      saveState();
+    }
+
+    function deleteOrderRow(idx) {
+      const data = tabsData[currentTab];
+      if (data.orders.length <= 1) return;
+      data.orders.splice(idx, 1);
+      renderOrderRows();
+      renderTable();
+      saveState();
+    }
+
+    function updateOrder(idx, key, val) {
+      tabsData[currentTab].orders[idx][key] = parseFloat(val) || 0;
+      renderTable();
+      saveState();
     }
 
     function getLimitPrice(ref, direction) {
@@ -1008,7 +1104,7 @@
     });
 
     loadState();
-    switchTab(currentTab);
+    handleTabClick(currentTab);
   </script>
 </body>
 </html>
