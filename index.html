@@ -42,7 +42,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       padding: 0 4px;
     }
     .header-left {
@@ -76,6 +76,33 @@
       align-items: center;
       justify-content: center;
     }
+
+    /* 多標的分頁籤 */
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .tab-item {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--card-bg);
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-item.active {
+      color: var(--text);
+      background: var(--card-inner);
+      border-color: var(--border);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    }
+
     .segmented-control {
       display: flex;
       background: var(--card-bg);
@@ -186,6 +213,24 @@
       height: 18px;
       accent-color: var(--primary);
       cursor: pointer;
+    }
+    .unit-switch {
+      display: inline-flex;
+      background: #1c1c1e;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .unit-switch-btn {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .unit-switch-btn.active {
+      background: var(--primary);
+      color: #ffffff;
     }
     .order-list {
       margin-top: 8px;
@@ -323,7 +368,7 @@
     .loss-text { color: var(--loss); font-weight: 700; }
     .muted-text { color: var(--text-muted); font-size: 0.72rem; }
 
-    /* Modal / Settings Overlay */
+    /* Modal */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -383,6 +428,13 @@
     <button class="gear-btn" onclick="openSettings()" title="設定">⚙️</button>
   </div>
 
+  <!-- 多標的分頁列 -->
+  <div class="tab-bar">
+    <div class="tab-item active" data-tab="0" onclick="switchTab(0)">標的 1</div>
+    <div class="tab-item" data-tab="1" onclick="switchTab(1)">標的 2</div>
+    <div class="tab-item" data-tab="2" onclick="switchTab(2)">標的 3</div>
+  </div>
+
   <div class="segmented-control">
     <div class="segment-btn active" data-mode="daytrade" onclick="setMode('daytrade')">當沖</div>
     <div class="segment-btn" data-mode="swing" onclick="setMode('swing')">波段</div>
@@ -404,12 +456,19 @@
     </div>
 
     <div style="padding-top: 8px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <span class="input-label">下單價格 / 張數明細</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span class="input-label">下單明細</span>
+          <!-- 波段零股切換開關 -->
+          <div class="unit-switch" id="unitSwitch" style="display:none;">
+            <div class="unit-switch-btn active" id="unitLotBtn" onclick="setUnitType('lot')">整張</div>
+            <div class="unit-switch-btn" id="unitOddBtn" onclick="setUnitType('odd')">零股</div>
+          </div>
+        </div>
         <span id="avgDisplay" style="font-size:0.75rem; color:var(--primary); font-weight:700;"></span>
       </div>
       <div class="order-list" id="orderList"></div>
-      <div class="add-order-btn" onclick="addOrderRow()">+ 新增一筆不同價格/張數</div>
+      <div class="add-order-btn" id="addBtnText" onclick="addOrderRow()">+ 新增一筆下單</div>
     </div>
 
     <div class="input-row" id="tickRangeRow" style="margin-top:8px;">
@@ -458,7 +517,7 @@
     </div>
   </div>
 
-  <!-- 設定彈窗 (Modal) -->
+  <!-- 設定彈窗 -->
   <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -475,92 +534,138 @@
       </div>
 
       <div style="margin-top:14px; text-align:right;">
-        <span style="font-size:0.75rem; color:var(--text-muted);">設定會自動儲存於此裝置</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);">所有設定與分頁皆已自動儲存</span>
       </div>
     </div>
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_pref_v1';
-    let currentMode = 'daytrade';
-    let currentDirection = 'buy';
+    const STORAGE_KEY = 'taiwan_stock_calc_v2_data';
+
+    let currentTab = 0;
     let minFeeLimit = 20;
 
-    let orders = [
-      { price: 100, lots: 1 }
+    // 預設三個獨立的分頁資料結構
+    let tabsData = [
+      { mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false },
+      { mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 50, qty: 1 }], basePrice: 50, enableBase: false },
+      { mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 200, qty: 1 }], basePrice: 200, enableBase: false }
     ];
 
-    function loadPreferences() {
+    function loadState() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
-          const pref = JSON.parse(saved);
-          if (pref.discount) document.getElementById('discountSelect').value = pref.discount;
-          if (pref.tickRange) document.getElementById('tickRange').value = pref.tickRange;
-          if (pref.minFee !== undefined) {
-            minFeeLimit = parseInt(pref.minFee, 10);
+          const parsed = JSON.parse(saved);
+          if (parsed.tabsData) tabsData = parsed.tabsData;
+          if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
+          if (parsed.discount) document.getElementById('discountSelect').value = parsed.discount;
+          if (parsed.tickRange) document.getElementById('tickRange').value = parsed.tickRange;
+          if (parsed.minFee !== undefined) {
+            minFeeLimit = parseInt(parsed.minFee, 10);
             document.getElementById('minFeeSelect').value = minFeeLimit;
           }
-          if (pref.mode) currentMode = pref.mode;
         }
       } catch (e) {
         console.error(e);
       }
     }
 
-    function savePreferences() {
+    function saveState() {
       try {
-        const pref = {
+        const payload = {
+          tabsData: tabsData,
+          currentTab: currentTab,
           discount: document.getElementById('discountSelect').value,
           tickRange: document.getElementById('tickRange').value,
-          minFee: document.getElementById('minFeeSelect').value,
-          mode: currentMode
+          minFee: minFeeLimit
         };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(pref));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       } catch (e) {
         console.error(e);
       }
     }
 
-    function openSettings() {
-      document.getElementById('settingsModal').style.display = 'flex';
+    function switchTab(index) {
+      currentTab = index;
+      document.querySelectorAll('.tab-item').forEach((tab, i) => {
+        tab.classList.toggle('active', i === currentTab);
+      });
+      syncUIFromCurrentTab();
+      saveState();
     }
 
-    function closeSettings(e) {
-      if (!e || e.target.id === 'settingsModal' || e.target.classList.contains('close-btn')) {
-        document.getElementById('settingsModal').style.display = 'none';
-      }
-    }
-
-    function setMode(mode) {
-      currentMode = mode;
+    function syncUIFromCurrentTab() {
+      const data = tabsData[currentTab];
+      
+      // 模式
       document.querySelectorAll('.segment-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === mode);
+        btn.classList.toggle('active', btn.dataset.mode === data.mode);
       });
 
+      // 買賣方向列
       const dirBar = document.getElementById('directionBar');
-      if (mode === 'daytrade') {
+      if (data.mode === 'daytrade') {
         dirBar.style.display = 'flex';
       } else {
         dirBar.style.display = 'none';
-        currentDirection = 'buy';
+        data.direction = 'buy';
       }
 
-      savePreferences();
+      // 開盤價
+      document.getElementById('enableBasePrice').checked = data.enableBase;
+      document.getElementById('basePrice').disabled = !data.enableBase;
+      document.getElementById('basePrice').value = data.basePrice;
+
+      // 零股開關
+      const unitSwitch = document.getElementById('unitSwitch');
+      if (data.mode === 'swing') {
+        unitSwitch.style.display = 'inline-flex';
+        document.getElementById('unitLotBtn').classList.toggle('active', data.unit === 'lot');
+        document.getElementById('unitOddBtn').classList.toggle('active', data.unit === 'odd');
+      } else {
+        unitSwitch.style.display = 'none';
+        data.unit = 'lot';
+      }
+
       updateDirectionUI();
+      renderOrderRows();
       renderTable();
+    }
+
+    function setMode(mode) {
+      const data = tabsData[currentTab];
+      data.mode = mode;
+      if (mode !== 'swing') data.unit = 'lot';
+      syncUIFromCurrentTab();
+      saveState();
     }
 
     function setDirection(dir) {
-      currentDirection = dir;
+      tabsData[currentTab].direction = dir;
       updateDirectionUI();
       renderTable();
+      saveState();
+    }
+
+    function setUnitType(unit) {
+      tabsData[currentTab].unit = unit;
+      // 若從整張切換到零股，將預設張數轉為股數預設值
+      tabsData[currentTab].orders.forEach(o => {
+        if (unit === 'odd' && o.qty <= 50) o.qty = Math.round(o.qty * 1000);
+        if (unit === 'lot' && o.qty >= 100) o.qty = Math.max(1, Math.round(o.qty / 1000));
+      });
+      syncUIFromCurrentTab();
+      saveState();
     }
 
     function updateDirectionUI() {
+      const data = tabsData[currentTab];
+      const isShort = data.direction === 'sell' && data.mode === 'daytrade';
+      
       const btnBuy = document.getElementById('btnBuy');
       const btnSell = document.getElementById('btnSell');
-      if (currentDirection === 'buy') {
+      if (data.direction === 'buy') {
         btnBuy.className = 'order-btn active-buy';
         btnSell.className = 'order-btn';
       } else {
@@ -568,49 +673,59 @@
         btnSell.className = 'order-btn active-sell';
       }
 
-      const isShort = currentDirection === 'sell';
       const badgeMap = {
         daytrade: isShort ? '當沖賣出 0.15%' : '當沖買進 0.15%',
-        swing: '波段買進 0.3%',
+        swing: `波段${data.unit === 'odd' ? '零股' : '買進'} 0.3%`,
         warrant: '權證買進 0.1%'
       };
-      document.getElementById('rateBadge').innerText = badgeMap[currentMode];
+      document.getElementById('rateBadge').innerText = badgeMap[data.mode];
       document.getElementById('thPriceLabel').innerText = isShort ? '回補價格' : '賣出價格';
     }
 
     function renderOrderRows() {
+      const data = tabsData[currentTab];
       const list = document.getElementById('orderList');
       list.innerHTML = '';
-      orders.forEach((item, idx) => {
+      
+      const isOdd = data.unit === 'odd' && data.mode === 'swing';
+      const qtyLabel = isOdd ? '股數' : '張數';
+      const qtyStep = isOdd ? '1' : 'any';
+
+      data.orders.forEach((item, idx) => {
         const row = document.createElement('div');
         row.className = 'order-row';
         row.innerHTML = `
           <span class="order-tag">#${idx + 1}</span>
           <input type="number" class="order-input" placeholder="價格" value="${item.price}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
-          <input type="number" class="order-input" placeholder="張數" value="${item.lots}" step="any" min="0.001" inputmode="decimal" oninput="updateOrder(${idx}, 'lots', this.value)">
-          ${orders.length > 1 ? `<button class="order-del-btn" type="button" onclick="deleteOrderRow(${idx})">×</button>` : ''}
+          <input type="number" class="order-input" placeholder="${qtyLabel}" value="${item.qty}" step="${qtyStep}" min="${isOdd ? 1 : 0.001}" inputmode="${isOdd ? 'numeric' : 'decimal'}" oninput="updateOrder(${idx}, 'qty', this.value)">
+          ${data.orders.length > 1 ? `<button class="order-del-btn" type="button" onclick="deleteOrderRow(${idx})">×</button>` : ''}
         `;
         list.appendChild(row);
       });
     }
 
     function addOrderRow() {
-      const last = orders[orders.length - 1] || { price: 100, lots: 1 };
-      orders.push({ price: last.price, lots: 1 });
+      const data = tabsData[currentTab];
+      const last = data.orders[data.orders.length - 1] || { price: 100, qty: data.unit === 'odd' ? 100 : 1 };
+      data.orders.push({ price: last.price, qty: last.qty });
       renderOrderRows();
       renderTable();
+      saveState();
     }
 
     function deleteOrderRow(idx) {
-      if (orders.length <= 1) return;
-      orders.splice(idx, 1);
+      const data = tabsData[currentTab];
+      if (data.orders.length <= 1) return;
+      data.orders.splice(idx, 1);
       renderOrderRows();
       renderTable();
+      saveState();
     }
 
     function updateOrder(idx, key, val) {
-      orders[idx][key] = parseFloat(val) || 0;
+      tabsData[currentTab].orders[idx][key] = parseFloat(val) || 0;
       renderTable();
+      saveState();
     }
 
     function getTickSize(price) {
@@ -689,32 +804,33 @@
     }
 
     function renderTable() {
-      const isShort = currentMode === 'daytrade' && currentDirection === 'sell';
-      const isBaseEnabled = document.getElementById('enableBasePrice').checked;
-      const basePrice = parseFloat(document.getElementById('basePrice').value);
+      const data = tabsData[currentTab];
+      const isShort = data.mode === 'daytrade' && data.direction === 'sell';
+      const isOdd = data.unit === 'odd' && data.mode === 'swing';
+      const isBaseEnabled = data.enableBase;
+      const basePrice = data.basePrice;
       const discount = parseFloat(document.getElementById('discountSelect').value);
-      const taxRate = getTaxRate(currentMode);
+      const taxRate = getTaxRate(data.mode);
 
       document.getElementById('tickRangeRow').style.display = isBaseEnabled ? 'none' : 'flex';
-      document.getElementById('basePrice').disabled = !isBaseEnabled;
 
       let totalVal = 0;
-      let totalLots = 0;
-      orders.forEach(item => {
-        if (item.price > 0 && item.lots > 0) {
-          totalVal += item.price * item.lots;
-          totalLots += item.lots;
+      let totalQty = 0;
+      data.orders.forEach(item => {
+        if (item.price > 0 && item.qty > 0) {
+          totalVal += item.price * item.qty;
+          totalQty += item.qty;
         }
       });
 
-      if (totalLots === 0 || totalVal === 0) return;
+      if (totalQty === 0 || totalVal === 0) return;
 
-      const inputPrice = totalVal / totalLots;
-      const shares = Math.round(totalLots * 1000);
+      const inputPrice = totalVal / totalQty;
+      const totalShares = isOdd ? Math.round(totalQty) : Math.round(totalQty * 1000);
 
-      document.getElementById('avgDisplay').innerText = orders.length > 1 
-        ? `均價 ${inputPrice.toFixed(2)} 元 (${totalLots}張)` 
-        : `${totalLots} 張 (${shares}股)`;
+      document.getElementById('avgDisplay').innerText = data.orders.length > 1 
+        ? `均價 ${inputPrice.toFixed(2)} 元 (${isOdd ? totalShares + '股' : totalQty + '張'})` 
+        : `${isOdd ? totalShares + ' 股' : totalQty + ' 張 (' + totalShares + '股)'}`;
 
       let upPrices = [];
       let downPrices = [];
@@ -757,7 +873,7 @@
 
       const list = [
         ...upPrices.reverse(),
-        { tickOffset: orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進'), price: inputPrice, isBaseRow: true },
+        { tickOffset: data.orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進'), price: inputPrice, isBaseRow: true },
         ...downPrices
       ];
 
@@ -767,7 +883,7 @@
       let breakEvenTick = null;
 
       list.forEach(item => {
-        const res = calculateTrade(inputPrice, item.price, shares, discount, taxRate, isShort);
+        const res = calculateTrade(inputPrice, item.price, totalShares, discount, taxRate, isShort);
         const tr = document.createElement('tr');
 
         if (item.isBaseRow) {
@@ -810,7 +926,7 @@
       while (count < 300) {
         searchP = stepTick(searchP, isShort ? -1 : 1);
         count++;
-        const res = calculateTrade(inputPrice, searchP, shares, discount, taxRate, isShort);
+        const res = calculateTrade(inputPrice, searchP, totalShares, discount, taxRate, isShort);
         if (res.netProfit > 0) {
           beText = `${count} Tick (${searchP.toFixed(2)})`;
           break;
@@ -836,8 +952,8 @@
             <div class="summary-value">${getTickSize(inputPrice)} 元</div>
           </div>
           <div class="summary-box">
-            <div class="summary-title">模式 / 低消</div>
-            <div class="summary-value">${isShort ? '先賣後買' : '先買後賣'} (${minFeeLimit === 1 ? '無低消' : '低消20'})</div>
+            <div class="summary-title">交易規格 / 稅率</div>
+            <div class="summary-value">${isOdd ? '零股交易' : (isShort ? '先賣後買' : '現股買進')} ${(taxRate * 100).toFixed(2)}%</div>
           </div>
         `;
       }
@@ -849,37 +965,50 @@
         </div>
         <div class="summary-box">
           <div class="summary-title">${isShort ? '賣出總額 (含規費)' : '買進總額 (含規費)'}</div>
-          <div class="summary-value">${Math.round(inputPrice * shares).toLocaleString()} 元</div>
+          <div class="summary-value">${Math.round(inputPrice * totalShares).toLocaleString()} 元</div>
         </div>
         ${dynamicBoxes}
       `;
     }
 
+    function openSettings() {
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+
+    function closeSettings(e) {
+      if (!e || e.target.id === 'settingsModal' || e.target.classList.contains('close-btn')) {
+        document.getElementById('settingsModal').style.display = 'none';
+      }
+    }
+
     document.getElementById('minFeeSelect').addEventListener('change', (e) => {
       minFeeLimit = parseInt(e.target.value, 10);
-      savePreferences();
+      saveState();
       renderTable();
     });
 
     document.getElementById('enableBasePrice').addEventListener('change', (e) => {
+      tabsData[currentTab].enableBase = e.target.checked;
       document.getElementById('basePrice').disabled = !e.target.checked;
+      saveState();
       renderTable();
     });
 
-    ['basePrice', 'discountSelect', 'tickRange'].forEach(id => {
-      document.getElementById(id).addEventListener('input', () => {
-        savePreferences();
-        renderTable();
-      });
+    document.getElementById('basePrice').addEventListener('input', (e) => {
+      tabsData[currentTab].basePrice = parseFloat(e.target.value) || 0;
+      saveState();
+      renderTable();
+    });
+
+    ['discountSelect', 'tickRange'].forEach(id => {
       document.getElementById(id).addEventListener('change', () => {
-        savePreferences();
+        saveState();
         renderTable();
       });
     });
 
-    loadPreferences();
-    renderOrderRows();
-    setMode(currentMode);
+    loadState();
+    switchTab(currentTab);
   </script>
 </body>
 </html>
