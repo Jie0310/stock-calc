@@ -128,7 +128,7 @@
       flex: 1;
       text-align: center;
       padding: 7px 0;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-muted);
       border-radius: 7px;
@@ -571,45 +571,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* 指數/期貨模式專用樣式 */
-    .market-index-tabs {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 5px;
-      margin-bottom: 8px;
-    }
-    .market-index-btn {
-      background: var(--card-bg);
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      padding: 8px 2px;
-      border-radius: 8px;
-      font-size: 0.76rem;
-      font-weight: 700;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .market-index-btn.active {
-      background: var(--card-inner);
-      color: var(--text);
-      border-color: var(--primary);
-      box-shadow: 0 2px 6px rgba(10, 132, 255, 0.25);
-    }
-    .market-chart-container {
-      background: var(--card-bg);
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      overflow: hidden;
-      height: 380px;
-      margin-bottom: 10px;
-    }
-    .tradingview-chart-box {
-      width: 100%;
-      height: 100%;
-      background: #000000;
-    }
-
     /* Modal */
     .modal-overlay {
       position: fixed;
@@ -685,7 +646,6 @@
       background: rgba(255, 69, 58, 0.3);
     }
   </style>
-  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
 <body>
 
@@ -702,23 +662,9 @@
     <div class="segment-btn" data-mode="swing" onclick="setMode('swing')">波段</div>
     <div class="segment-btn" data-mode="warrant" onclick="setMode('warrant')">權證</div>
     <div class="segment-btn" data-mode="inventory" onclick="setMode('inventory')">庫存</div>
-    <div class="segment-btn" data-mode="market" onclick="setMode('market')">大盤/期貨</div>
   </div>
 
-  <div class="tab-bar" id="calcTabBar">
-    <div class="tab-item active" data-tab="0" onclick="handleTabClick(0)">
-      <span id="tabName0">標的 1</span>
-      <span class="tab-edit-icon" onclick="renameTab(event, 0)">✎</span>
-    </div>
-    <div class="tab-item" data-tab="1" onclick="handleTabClick(1)">
-      <span id="tabName1">標的 2</span>
-      <span class="tab-edit-icon" onclick="renameTab(event, 1)">✎</span>
-    </div>
-    <div class="tab-item" data-tab="2" onclick="handleTabClick(2)">
-      <span id="tabName2">標的 3</span>
-      <span class="tab-edit-icon" onclick="renameTab(event, 2)">✎</span>
-    </div>
-  </div>
+  <div class="tab-bar" id="calcTabBar"></div>
 
   <div class="order-segmented" id="directionBar">
     <div class="order-btn active-buy" id="btnBuy" onclick="setDirection('buy')">買進 (做多)</div>
@@ -820,47 +766,26 @@
     <div id="inventoryList"></div>
   </div>
 
-  <!-- 大盤與期貨專屬區塊 (加權/櫃買/TXF1/TXF8) -->
-  <div id="marketView" style="display:none;">
-    <div class="market-index-tabs">
-      <div class="market-index-btn active" data-idx="tse" onclick="selectMarketIndex('tse')">加權指數</div>
-      <div class="market-index-btn" data-idx="otc" onclick="selectMarketIndex('otc')">櫃買指數</div>
-      <div class="market-index-btn" data-idx="txf1" onclick="selectMarketIndex('txf1')">TXF1 日盤</div>
-      <div class="market-index-btn" data-idx="txf8" onclick="selectMarketIndex('txf8')">TXF8 全/夜</div>
-    </div>
-
-    <div class="quote-info-box" id="marketInfoBox" style="margin-bottom:8px;">
-      <div>
-        <span class="quote-stock-name" id="marketTitle">加權指數</span>
-        <span id="marketPriceDiff" style="margin-left:6px; font-weight:700;">--</span>
-      </div>
-      <div style="color:var(--text-muted); font-size:0.72rem; display:flex; align-items:center;">
-        <span class="pulse-dot" id="marketLiveDot"></span>
-        <span id="marketTimeText">--:--</span>
-      </div>
-    </div>
-
-    <div class="market-chart-container">
-      <div class="tradingview-chart-box" id="tradingview_market_box"></div>
-    </div>
-
-    <div class="five-order-card" id="marketFiveOrderCard">
-      <div class="five-order-header">
-        <span>最佳五檔 (委買)</span>
-        <span>委賣五檔 (賣出)</span>
-      </div>
-      <table class="five-order-table">
-        <tbody id="marketFiveOrderBody"></tbody>
-      </table>
-    </div>
-  </div>
-
   <!-- 設定 Modal -->
   <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
         <span class="modal-title">⚙️ 偏好設定</span>
         <button class="close-btn" onclick="closeSettings()">✕</button>
+      </div>
+
+      <div class="modal-section-title">標的分頁顯示 (最多 3 檔)</div>
+      <div class="input-row">
+        <span class="input-label" id="tabSettingLabel0">啟用 標的 1</span>
+        <input type="checkbox" id="showTab0" class="custom-checkbox" checked onchange="handleTabVisibilityChange(0)">
+      </div>
+      <div class="input-row">
+        <span class="input-label" id="tabSettingLabel1">啟用 標的 2</span>
+        <input type="checkbox" id="showTab1" class="custom-checkbox" checked onchange="handleTabVisibilityChange(1)">
+      </div>
+      <div class="input-row">
+        <span class="input-label" id="tabSettingLabel2">啟用 標的 3</span>
+        <input type="checkbox" id="showTab2" class="custom-checkbox" checked onchange="handleTabVisibilityChange(2)">
       </div>
 
       <div class="modal-section-title">即時行情自動更新</div>
@@ -954,11 +879,10 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v29_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v31_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
-    let currentMarketKey = 'tse'; // 'tse', 'otc', 'txf1', 'txf8'
     let minFeeLimit = 20;
     let currentDiscount = 0.25;
     let autoRefresh = true;
@@ -966,14 +890,8 @@
     let refreshInterval = 5000;
     let refreshTimer = null;
     let isFetching = false;
-    let marketWidget = null;
 
-    const marketMeta = {
-      tse: { name: '加權指數', symbol: 'TWSE:TAIEX', apiSymbol: 'tse_t00.tw' },
-      otc: { name: '櫃買指數', symbol: 'TPEX:TPEX', apiSymbol: 'otc_o00.tw' },
-      txf1: { name: 'TXF1 台指期(日盤)', symbol: 'TAIFEX:TX1!', apiSymbol: 'TXF1' },
-      txf8: { name: 'TXF8 台指期(全/夜盤)', symbol: 'TAIFEX:TXF1!', apiSymbol: 'TXF8' }
-    };
+    let enabledTabs = [true, true, true];
 
     let displayConfig = {
       summaryBreakeven: true,
@@ -1015,8 +933,12 @@
           if (parsed.tabsData) tabsData = parsed.tabsData;
           if (parsed.inventoryData) inventoryData = parsed.inventoryData;
           if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
-          if (parsed.currentMode !== undefined) currentMode = parsed.currentMode;
-          if (parsed.currentMarketKey) currentMarketKey = parsed.currentMarketKey;
+          if (parsed.currentMode !== undefined && parsed.currentMode !== 'market' && parsed.currentMode !== 'futures') {
+            currentMode = parsed.currentMode;
+          } else {
+            currentMode = 'daytrade';
+          }
+          if (parsed.enabledTabs) enabledTabs = parsed.enabledTabs;
           if (parsed.tickRange) document.getElementById('tickRange').value = parsed.tickRange;
           if (parsed.minFee !== undefined) {
             minFeeLimit = parseInt(parsed.minFee, 10);
@@ -1057,6 +979,57 @@
       document.getElementById('showColProfit').checked = displayConfig.colProfit;
       document.getElementById('showColRoi').checked = displayConfig.colRoi;
       document.getElementById('showFiveOrderToggle').checked = showFiveOrder;
+
+      document.getElementById('showTab0').checked = enabledTabs[0];
+      document.getElementById('showTab1').checked = enabledTabs[1];
+      document.getElementById('showTab2').checked = enabledTabs[2];
+      updateTabSettingLabels();
+    }
+
+    function updateTabSettingLabels() {
+      document.getElementById('tabSettingLabel0').innerText = `啟用 ${tabsData[0].name || '標的 1'}`;
+      document.getElementById('tabSettingLabel1').innerText = `啟用 ${tabsData[1].name || '標的 2'}`;
+      document.getElementById('tabSettingLabel2').innerText = `啟用 ${tabsData[2].name || '標的 3'}`;
+    }
+
+    function handleTabVisibilityChange(idx) {
+      const isChecked = document.getElementById(`showTab${idx}`).checked;
+      const activeCount = enabledTabs.filter((t, i) => i === idx ? isChecked : t).length;
+      if (activeCount === 0) {
+        alert('請至少保留一個標的分頁！');
+        document.getElementById(`showTab${idx}`).checked = true;
+        return;
+      }
+
+      enabledTabs[idx] = isChecked;
+
+      if (!enabledTabs[currentTab]) {
+        currentTab = enabledTabs.findIndex(t => t);
+      }
+
+      saveState();
+      renderTabs();
+      syncUIFromCurrentTab();
+    }
+
+    function renderTabs() {
+      const tabBar = document.getElementById('calcTabBar');
+      tabBar.innerHTML = '';
+
+      tabsData.forEach((t, i) => {
+        if (enabledTabs[i]) {
+          const tabItem = document.createElement('div');
+          tabItem.className = `tab-item ${i === currentTab ? 'active' : ''}`;
+          tabItem.dataset.tab = i;
+          tabItem.onclick = () => handleTabClick(i);
+          tabItem.innerHTML = `
+            <span id="tabName${i}">${t.name || `標的 ${i + 1}`}</span>
+            <span class="tab-edit-icon" onclick="renameTab(event, ${i})">✎</span>
+          `;
+          tabBar.appendChild(tabItem);
+        }
+      });
+      tabBar.style.display = (currentMode === 'inventory') ? 'none' : 'flex';
     }
 
     function handleDisplayToggle() {
@@ -1068,7 +1041,7 @@
       displayConfig.colProfit = document.getElementById('showColProfit').checked;
       displayConfig.colRoi = document.getElementById('showColRoi').checked;
       saveState();
-      if (currentMode !== 'inventory' && currentMode !== 'market') renderTable();
+      if (currentMode !== 'inventory') renderTable();
     }
 
     function handleAutoRefreshToggle() {
@@ -1080,7 +1053,7 @@
     function handleFiveOrderToggle() {
       showFiveOrder = document.getElementById('showFiveOrderToggle').checked;
       saveState();
-      if (currentMode !== 'inventory' && currentMode !== 'market') renderQuoteBanner(tabsData[currentTab].quote);
+      if (currentMode !== 'inventory') renderQuoteBanner(tabsData[currentTab].quote);
     }
 
     function handleIntervalChange(val) {
@@ -1118,7 +1091,7 @@
       }
       saveState();
       if (currentMode === 'inventory') renderInventoryList();
-      else if (currentMode !== 'market') renderTable();
+      else renderTable();
     }
 
     document.getElementById('customDiscountInput').addEventListener('input', (e) => {
@@ -1127,7 +1100,7 @@
         currentDiscount = val;
         saveState();
         if (currentMode === 'inventory') recalculateInventorySummary();
-        else if (currentMode !== 'market') renderTable();
+        else renderTable();
       }
     });
 
@@ -1138,7 +1111,7 @@
           inventoryData: inventoryData,
           currentTab: currentTab,
           currentMode: currentMode,
-          currentMarketKey: currentMarketKey,
+          enabledTabs: enabledTabs,
           discount: currentDiscount,
           tickRange: document.getElementById('tickRange').value,
           minFee: minFeeLimit,
@@ -1155,9 +1128,7 @@
 
     function handleTabClick(index) {
       currentTab = index;
-      document.querySelectorAll('#calcTabBar .tab-item').forEach((tab, i) => {
-        tab.classList.toggle('active', i === currentTab);
-      });
+      renderTabs();
       syncUIFromCurrentTab();
       saveState();
       restartAutoRefresh();
@@ -1169,21 +1140,15 @@
       const newName = prompt('請輸入此標的名稱（例如：2330 台積電）：', currentName);
       if (newName !== null && newName.trim() !== '') {
         tabsData[index].name = newName.trim();
-        updateTabTitles();
+        renderTabs();
+        updateTabSettingLabels();
         saveState();
       }
     }
 
-    function updateTabTitles() {
-      tabsData.forEach((t, i) => {
-        const el = document.getElementById(`tabName${i}`);
-        if (el) el.innerText = t.name || `標的 ${i + 1}`;
-      });
-    }
-
     function syncUIFromCurrentTab() {
       const data = tabsData[currentTab];
-      updateTabTitles();
+      renderTabs();
 
       document.getElementById('quoteSymbolInput').value = data.symbol || '';
       renderQuoteBanner(data.quote);
@@ -1196,32 +1161,19 @@
       const dirBar = document.getElementById('directionBar');
       const calcView = document.getElementById('calcView');
       const inventoryView = document.getElementById('inventoryView');
-      const marketView = document.getElementById('marketView');
 
       if (currentMode === 'inventory') {
         calcTabBar.style.display = 'none';
         dirBar.style.display = 'none';
         calcView.style.display = 'none';
-        marketView.style.display = 'none';
         inventoryView.style.display = 'block';
         renderInventoryList();
-        return;
-      }
-
-      if (currentMode === 'market') {
-        calcTabBar.style.display = 'none';
-        dirBar.style.display = 'none';
-        calcView.style.display = 'none';
-        inventoryView.style.display = 'none';
-        marketView.style.display = 'block';
-        updateMarketView();
         return;
       }
 
       calcTabBar.style.display = 'flex';
       calcView.style.display = 'block';
       inventoryView.style.display = 'none';
-      marketView.style.display = 'none';
 
       if (data.mode === 'daytrade') {
         dirBar.style.display = 'flex';
@@ -1247,7 +1199,7 @@
 
     function setMode(mode) {
       currentMode = mode;
-      if (mode !== 'inventory' && mode !== 'market') {
+      if (mode !== 'inventory') {
         tabsData[currentTab].mode = mode;
         if (mode !== 'swing') tabsData[currentTab].unit = 'lot';
       }
@@ -1785,7 +1737,8 @@
           }
         }
 
-        updateTabTitles();
+        renderTabs();
+        updateTabSettingLabels();
         renderQuoteBanner(quoteObj);
         renderOrderRows();
         renderTable();
@@ -1811,7 +1764,8 @@
       if (tabsData[currentTab].orders.length > 0) {
         tabsData[currentTab].orders[0].price = null;
       }
-      updateTabTitles();
+      renderTabs();
+      updateTabSettingLabels();
       renderQuoteBanner(null);
       restartAutoRefresh();
       renderOrderRows();
@@ -2158,7 +2112,7 @@
             <div>
               <div class="inv-stat-label">損益 (報酬率)</div>
               <div class="inv-stat-val" id="inv-pnl-${invIdx}" style="color:${profitColor};">
-                ${(res.curPrice > 0 && res.hasValidBuyPrice) ? `${profitSign}${res.netProfit.toLocaleString()} (${profitSign}${roi}%)` : '--'}
+                ${(res.curPrice > 0 && res.hasValidBuyPrice) ? `${profitSign}${res.netProfit.toLocaleString()} (${profitSign}${res.roi}%)` : '--'}
               </div>
             </div>
           </div>
@@ -2175,148 +2129,6 @@
       recalculateInventorySummary();
     }
 
-    /* ---------------- 大盤 / 期貨 核心邏輯 (TradingView + 五檔) ---------------- */
-
-    function selectMarketIndex(key) {
-      currentMarketKey = key;
-      document.querySelectorAll('.market-index-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.idx === key);
-      });
-      saveState();
-      updateMarketView();
-    }
-
-    function updateMarketView() {
-      const meta = marketMeta[currentMarketKey] || marketMeta.tse;
-      document.getElementById('marketTitle').innerText = meta.name;
-      
-      // 更新 TradingView K線圖
-      renderMarketTradingViewChart(meta.symbol);
-      
-      // 更新五檔與報價
-      fetchMarketQuote(currentMarketKey);
-    }
-
-    function renderMarketTradingViewChart(tvSymbol) {
-      const container = document.getElementById('tradingview_market_box');
-      if (!container) return;
-      container.innerHTML = '';
-
-      if (typeof TradingView !== 'undefined') {
-        marketWidget = new TradingView.widget({
-          "autosize": true,
-          "symbol": tvSymbol,
-          "interval": "1",
-          "timezone": "Asia/Taipei",
-          "theme": "dark",
-          "style": "1",
-          "locale": "zh_TW",
-          "toolbar_bg": "#1c1c1e",
-          "enable_publishing": false,
-          "hide_top_toolbar": false,
-          "hide_legend": false,
-          "save_image": false,
-          "container_id": "tradingview_market_box",
-          "backgroundColor": "#000000",
-          "gridColor": "rgba(42, 46, 57, 0.25)"
-        });
-      } else {
-        container.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:0.85rem;">載入走勢圖中...</div>`;
-      }
-    }
-
-    async function fetchMarketQuote(key) {
-      const meta = marketMeta[key];
-      const targetSymbol = meta.apiSymbol;
-
-      try {
-        let q = null;
-        if (key === 'tse' || key === 'otc') {
-          const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=${targetSymbol}&json=1&delay=0&_=${Date.now()}`;
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-          const res = await fetch(proxyUrl);
-          const data = await res.json();
-          if (data && data.msgArray && data.msgArray[0]) {
-            const stock = data.msgArray[0];
-            const prevClose = parseFloat(stock.y) || 0;
-            const currentPrice = parseFloat(stock.z) || prevClose;
-            const diff = currentPrice - prevClose;
-            const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
-            const time = stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false });
-            q = { currentPrice, diff, diffPercent, time, bids: [], asks: [] };
-          }
-        } else {
-          // 期貨報價抓取
-          const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_2330.tw&json=1&delay=0&_=${Date.now()}`;
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-          const res = await fetch(proxyUrl);
-          const data = await res.json();
-          if (data && data.msgArray && data.msgArray[0]) {
-            const stock = data.msgArray[0];
-            const prevClose = parseFloat(stock.y) || 0;
-            const currentPrice = parseFloat(stock.z) || prevClose;
-            const parseFive = (pStr, vStr) => {
-              const prices = (pStr || '').split('_').filter(v => v !== '');
-              const vols = (vStr || '').split('_').filter(v => v !== '');
-              const list = [];
-              for (let i = 0; i < 5; i++) {
-                list.push({ price: prices[i] ? parseFloat(prices[i]) : null, vol: vols[i] ? parseInt(vols[i], 10) : null });
-              }
-              return list;
-            };
-            q = {
-              currentPrice,
-              diff: currentPrice - prevClose,
-              diffPercent: prevClose > 0 ? ((currentPrice - prevClose) / prevClose * 100) : 0,
-              time: stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false }),
-              bids: parseFive(stock.b, stock.g),
-              asks: parseFive(stock.a, stock.f)
-            };
-          }
-        }
-
-        if (q) {
-          renderMarketQuoteBanner(q);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    function renderMarketQuoteBanner(q) {
-      const diffEl = document.getElementById('marketPriceDiff');
-      const isUp = q.diff > 0;
-      const isDown = q.diff < 0;
-      const sign = isUp ? '+' : '';
-      const color = isUp ? 'var(--profit)' : (isDown ? 'var(--loss)' : 'var(--text-muted)');
-      
-      diffEl.style.color = color;
-      diffEl.innerText = `${q.currentPrice.toFixed(2)} (${sign}${q.diff.toFixed(2)} / ${sign}${q.diffPercent.toFixed(2)}%)`;
-      document.getElementById('marketTimeText').innerText = q.time;
-
-      const tbody = document.getElementById('marketFiveOrderBody');
-      tbody.innerHTML = '';
-
-      if (q.bids && q.bids.length > 0) {
-        for (let i = 0; i < 5; i++) {
-          const bid = q.bids[i] || { price: null, vol: null };
-          const ask = q.asks[i] || { price: null, vol: null };
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="five-bid-vol">${bid.vol !== null ? bid.vol : '-'}</td>
-            <td class="five-bid-price">${bid.price ? bid.price.toFixed(2) : '-'}</td>
-            <td style="width:12px; text-align:center; color:#38383a;">|</td>
-            <td class="five-ask-price">${ask.price ? ask.price.toFixed(2) : '-'}</td>
-            <td class="five-ask-vol">${ask.vol !== null ? ask.vol : '-'}</td>
-          `;
-          tbody.appendChild(tr);
-        }
-      } else {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding:10px 0;">現貨指數無五檔委託單，走勢同步上方即時 K 線</td></tr>`;
-      }
-    }
-
     function restartAutoRefresh() {
       if (refreshTimer) {
         clearInterval(refreshTimer);
@@ -2324,18 +2136,18 @@
       }
       if (!autoRefresh) return;
 
-      refreshTimer = setInterval(() => {
-        if (!document.hidden) {
-          if (currentMode === 'market') {
-            fetchMarketQuote(currentMarketKey);
-          } else if (currentMode !== 'inventory' && tabsData[currentTab].symbol) {
+      const symbol = tabsData[currentTab].symbol;
+      if (symbol && symbol.trim() !== '') {
+        refreshTimer = setInterval(() => {
+          if (tabsData[currentTab].symbol && !document.hidden && currentMode !== 'inventory') {
             fetchLiveQuote(false);
           }
-        }
-      }, refreshInterval);
+        }, refreshInterval);
+      }
     }
 
     function openSettings() {
+      updateTabSettingLabels();
       document.getElementById('settingsModal').style.display = 'flex';
     }
 
@@ -2351,10 +2163,9 @@
         inventoryData = JSON.parse(JSON.stringify(defaultInventory));
         currentTab = 0;
         currentMode = 'daytrade';
-        document.querySelectorAll('#calcTabBar .tab-item').forEach((tab, i) => {
-          tab.classList.toggle('active', i === 0);
-        });
+        enabledTabs = [true, true, true];
         saveState();
+        renderTabs();
         syncUIFromCurrentTab();
         restartAutoRefresh();
         closeSettings();
@@ -2365,7 +2176,7 @@
       minFeeLimit = parseInt(e.target.value, 10);
       saveState();
       if (currentMode === 'inventory') renderInventoryList();
-      else if (currentMode !== 'market') renderTable();
+      else renderTable();
     });
 
     document.getElementById('tickRange').addEventListener('change', () => {
@@ -2394,12 +2205,12 @@
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && autoRefresh) {
-        if (currentMode === 'market') fetchMarketQuote(currentMarketKey);
-        else if (currentMode !== 'inventory' && tabsData[currentTab].symbol) fetchLiveQuote(false);
+        if (currentMode !== 'inventory' && tabsData[currentTab].symbol) fetchLiveQuote(false);
       }
     });
 
     loadState();
+    renderTabs();
     handleTabClick(currentTab);
     startLiveClock();
   </script>
