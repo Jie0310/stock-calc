@@ -63,7 +63,7 @@
       background: var(--card-bg);
       padding: 3px;
       border-radius: 9px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
     .segment-btn {
       flex: 1;
@@ -80,6 +80,34 @@
       background: var(--card-inner);
       color: var(--text);
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .order-segmented {
+      display: flex;
+      background: var(--card-bg);
+      padding: 3px;
+      border-radius: 9px;
+      margin-bottom: 12px;
+      gap: 4px;
+    }
+    .order-btn {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--card-inner);
+    }
+    .order-btn.active-buy {
+      background: #ff453a;
+      color: #ffffff;
+    }
+    .order-btn.active-sell {
+      background: #30d158;
+      color: #000000;
     }
     .card {
       background: var(--card-bg);
@@ -140,6 +168,64 @@
       height: 18px;
       accent-color: var(--primary);
       cursor: pointer;
+    }
+    .order-list {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .order-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--card-inner);
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+    .order-tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      width: 22px;
+      text-align: center;
+    }
+    .order-input {
+      background: #1c1c1e;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-align: right;
+      flex: 1;
+      width: 0;
+    }
+    .order-del-btn {
+      background: rgba(255, 69, 58, 0.2);
+      color: var(--profit);
+      border: none;
+      border-radius: 6px;
+      width: 26px;
+      height: 26px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .add-order-btn {
+      background: var(--card-inner);
+      color: var(--primary);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 7px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      margin-top: 6px;
     }
     .summary-grid {
       display: grid;
@@ -224,13 +310,18 @@
 
   <div class="header">
     <h1>台股計算</h1>
-    <span class="badge" id="rateBadge">當沖 0.15%</span>
+    <span class="badge" id="rateBadge">當沖買進 0.15%</span>
   </div>
 
   <div class="segmented-control">
     <div class="segment-btn active" data-mode="daytrade" onclick="setMode('daytrade')">當沖</div>
     <div class="segment-btn" data-mode="swing" onclick="setMode('swing')">波段</div>
     <div class="segment-btn" data-mode="warrant" onclick="setMode('warrant')">權證</div>
+  </div>
+
+  <div class="order-segmented" id="directionBar">
+    <div class="order-btn active-buy" id="btnBuy" onclick="setDirection('buy')">買進 (做多)</div>
+    <div class="order-btn" id="btnSell" onclick="setDirection('sell')">賣出 (做空)</div>
   </div>
 
   <div class="card">
@@ -242,22 +333,16 @@
       <input type="number" id="basePrice" class="input-control" value="100" min="0.01" max="30000" step="any" inputmode="decimal" disabled>
     </div>
 
-    <div class="input-row">
-      <span class="input-label" id="priceLabel">買入價格 (元)</span>
-      <input type="number" id="stockPrice" class="input-control" value="100" min="0.01" max="30000" step="any" inputmode="decimal">
+    <div style="padding-top: 8px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span class="input-label" id="entryTitle">下單價格 / 張數明細</span>
+        <span id="avgDisplay" style="font-size:0.75rem; color:var(--primary); font-weight:700;"></span>
+      </div>
+      <div class="order-list" id="orderList"></div>
+      <div class="add-order-btn" onclick="addOrderRow()">+ 新增一筆不同價格/張數</div>
     </div>
 
-    <div class="input-row">
-      <span class="input-label">交易張數 (1張=1000股)</span>
-      <input type="number" id="lotAmount" class="input-control" value="1" step="any" min="0.001" inputmode="decimal">
-    </div>
-
-    <div class="input-row">
-      <span class="input-label">交易股數</span>
-      <input type="number" id="shareAmount" class="input-control" value="1000" step="100" min="1" inputmode="numeric">
-    </div>
-
-    <div class="input-row" id="tickRangeRow">
+    <div class="input-row" id="tickRangeRow" style="margin-top:8px;">
       <span class="input-label">顯示 Tick 範圍</span>
       <select id="tickRange" class="input-control">
         <option value="5">±5 個 Tick</option>
@@ -277,14 +362,6 @@
         <option value="0.6">6 折</option>
       </select>
     </div>
-
-    <div class="input-row" id="shortRow">
-      <span class="input-label">
-        <input type="checkbox" id="isShortTrade" class="custom-checkbox">
-        當沖做空 (先賣後買)
-      </span>
-      <span style="font-size:0.75rem;color:var(--text-muted);">下跌獲利</span>
-    </div>
   </div>
 
   <div class="summary-grid" id="summaryGrid"></div>
@@ -295,7 +372,7 @@
         <thead>
           <tr>
             <th class="text-center">檔位</th>
-            <th id="thPriceLabel">賣出股價</th>
+            <th id="thPriceLabel">出場價格</th>
             <th>總成本</th>
             <th>淨損益</th>
             <th>報酬率</th>
@@ -308,6 +385,10 @@
 
   <script>
     let currentMode = 'daytrade';
+    let currentDirection = 'buy';
+    let orders = [
+      { price: 100, lots: 1 }
+    ];
 
     function setMode(mode) {
       currentMode = mode;
@@ -315,26 +396,78 @@
         btn.classList.toggle('active', btn.dataset.mode === mode);
       });
 
-      const shortRow = document.getElementById('shortRow');
+      const dirBar = document.getElementById('directionBar');
       if (mode === 'daytrade') {
-        shortRow.style.display = 'flex';
+        dirBar.style.display = 'flex';
       } else {
-        shortRow.style.display = 'none';
-        document.getElementById('isShortTrade').checked = false;
+        dirBar.style.display = 'none';
+        currentDirection = 'buy';
       }
 
-      updateModeBadge();
+      updateDirectionUI();
       renderTable();
     }
 
-    function updateModeBadge() {
-      const isShort = currentMode === 'daytrade' && document.getElementById('isShortTrade').checked;
+    function setDirection(dir) {
+      currentDirection = dir;
+      updateDirectionUI();
+      renderTable();
+    }
+
+    function updateDirectionUI() {
+      const btnBuy = document.getElementById('btnBuy');
+      const btnSell = document.getElementById('btnSell');
+      if (currentDirection === 'buy') {
+        btnBuy.className = 'order-btn active-buy';
+        btnSell.className = 'order-btn';
+      } else {
+        btnBuy.className = 'order-btn';
+        btnSell.className = 'order-btn active-sell';
+      }
+
+      const isShort = currentDirection === 'sell';
       const badgeMap = {
-        daytrade: isShort ? '當沖做空 0.15%' : '當沖做多 0.15%',
-        swing: '波段 0.3%',
-        warrant: '權證 0.1%'
+        daytrade: isShort ? '當沖賣出 0.15%' : '當沖買進 0.15%',
+        swing: '波段買進 0.3%',
+        warrant: '權證買進 0.1%'
       };
       document.getElementById('rateBadge').innerText = badgeMap[currentMode];
+      document.getElementById('thPriceLabel').innerText = isShort ? '回補價格' : '賣出價格';
+    }
+
+    function renderOrderRows() {
+      const list = document.getElementById('orderList');
+      list.innerHTML = '';
+      orders.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'order-row';
+        row.innerHTML = `
+          <span class="order-tag">#${idx + 1}</span>
+          <input type="number" class="order-input" placeholder="價格" value="${item.price}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
+          <input type="number" class="order-input" placeholder="張數" value="${item.lots}" step="any" min="0.001" inputmode="decimal" oninput="updateOrder(${idx}, 'lots', this.value)">
+          ${orders.length > 1 ? `<button class="order-del-btn" type="button" onclick="deleteOrderRow(${idx})">×</button>` : ''}
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    function addOrderRow() {
+      const last = orders[orders.length - 1] || { price: 100, lots: 1 };
+      orders.push({ price: last.price, lots: 1 });
+      renderOrderRows();
+      renderTable();
+    }
+
+    function deleteOrderRow(idx) {
+      if (orders.length <= 1) return;
+      orders.splice(idx, 1);
+      renderOrderRows();
+      renderTable();
+    }
+
+    function updateOrder(idx, key, val) {
+      orders[idx][key] = parseFloat(val) || 0;
+      renderTable();
     }
 
     function getTickSize(price) {
@@ -407,20 +540,32 @@
     }
 
     function renderTable() {
-      const isShort = currentMode === 'daytrade' && document.getElementById('isShortTrade').checked;
+      const isShort = currentMode === 'daytrade' && currentDirection === 'sell';
       const isBaseEnabled = document.getElementById('enableBasePrice').checked;
       const basePrice = parseFloat(document.getElementById('basePrice').value);
-      const inputPrice = parseFloat(document.getElementById('stockPrice').value);
       const discount = parseFloat(document.getElementById('discountSelect').value);
-      const shares = parseInt(document.getElementById('shareAmount').value, 10);
       const taxRate = getTaxRate(currentMode);
 
-      document.getElementById('priceLabel').innerText = isShort ? '賣出價格 (元)' : '買入價格 (元)';
-      document.getElementById('thPriceLabel').innerText = isShort ? '回補股價' : '賣出股價';
       document.getElementById('tickRangeRow').style.display = isBaseEnabled ? 'none' : 'flex';
       document.getElementById('basePrice').disabled = !isBaseEnabled;
 
-      if (isNaN(inputPrice) || inputPrice <= 0 || isNaN(shares) || shares <= 0) return;
+      let totalVal = 0;
+      let totalLots = 0;
+      orders.forEach(item => {
+        if (item.price > 0 && item.lots > 0) {
+          totalVal += item.price * item.lots;
+          totalLots += item.lots;
+        }
+      });
+
+      if (totalLots === 0 || totalVal === 0) return;
+
+      const inputPrice = totalVal / totalLots;
+      const shares = Math.round(totalLots * 1000);
+
+      document.getElementById('avgDisplay').innerText = orders.length > 1 
+        ? `均價 ${inputPrice.toFixed(2)} 元 (${totalLots}張)` 
+        : `${totalLots} 張 (${shares}股)`;
 
       let upPrices = [];
       let downPrices = [];
@@ -463,7 +608,7 @@
 
       const list = [
         ...upPrices.reverse(),
-        { tickOffset: isShort ? '先賣' : '買入', price: inputPrice, isBaseRow: true },
+        { tickOffset: orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進'), price: inputPrice, isBaseRow: true },
         ...downPrices
       ];
 
@@ -542,7 +687,7 @@
             <div class="summary-value">${getTickSize(inputPrice)} 元</div>
           </div>
           <div class="summary-box">
-            <div class="summary-title">交易方向 / 稅率</div>
+            <div class="summary-title">模式 / 稅率</div>
             <div class="summary-value">${isShort ? '先賣後買' : '先買後賣'} ${(taxRate * 100).toFixed(2)}%</div>
           </div>
         `;
@@ -554,44 +699,25 @@
           <div class="summary-value highlight-val">${beText}</div>
         </div>
         <div class="summary-box">
-          <div class="summary-title">${isShort ? '賣出金額 (含低消)' : '買進成本 (含低消)'}</div>
+          <div class="summary-title">${isShort ? '賣出總額 (含低消)' : '買進總額 (含低消)'}</div>
           <div class="summary-value">${Math.round(inputPrice * shares).toLocaleString()} 元</div>
         </div>
         ${dynamicBoxes}
       `;
     }
 
-    document.getElementById('isShortTrade').addEventListener('change', () => {
-      updateModeBadge();
-      renderTable();
-    });
-
     document.getElementById('enableBasePrice').addEventListener('change', (e) => {
       document.getElementById('basePrice').disabled = !e.target.checked;
       renderTable();
     });
 
-    document.getElementById('lotAmount').addEventListener('input', (e) => {
-      const lots = parseFloat(e.target.value);
-      if (!isNaN(lots)) {
-        document.getElementById('shareAmount').value = Math.round(lots * 1000);
-        renderTable();
-      }
-    });
-
-    document.getElementById('shareAmount').addEventListener('input', (e) => {
-      const shares = parseFloat(e.target.value);
-      if (!isNaN(shares)) {
-        document.getElementById('lotAmount').value = (shares / 1000).toFixed(3).replace(/\.?0+$/, '');
-        renderTable();
-      }
-    });
-
-    ['basePrice', 'stockPrice', 'discountSelect', 'tickRange'].forEach(id => {
+    ['basePrice', 'discountSelect', 'tickRange'].forEach(id => {
       document.getElementById(id).addEventListener('input', renderTable);
       document.getElementById(id).addEventListener('change', renderTable);
     });
 
+    renderOrderRows();
+    updateDirectionUI();
     renderTable();
   </script>
 </body>
