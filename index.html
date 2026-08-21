@@ -41,9 +41,14 @@
     .header {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: center;
       margin-bottom: 10px;
       padding: 0 4px;
+    }
+    .header-left {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
     }
     h1 {
       font-size: 1.35rem;
@@ -57,6 +62,19 @@
       background: var(--card-bg);
       padding: 3px 8px;
       border-radius: 6px;
+    }
+    .gear-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.1rem;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .segmented-control {
       display: flex;
@@ -304,13 +322,65 @@
     .profit-text { color: var(--profit); font-weight: 700; }
     .loss-text { color: var(--loss); font-weight: 700; }
     .muted-text { color: var(--text-muted); font-size: 0.72rem; }
+
+    /* Modal / Settings Overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 360px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+    .close-btn {
+      background: var(--card-inner);
+      border: none;
+      color: var(--text);
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h1>台股計算</h1>
-    <span class="badge" id="rateBadge">當沖買進 0.15%</span>
+    <div class="header-left">
+      <h1>台股計算</h1>
+      <span class="badge" id="rateBadge">當沖買進 0.15%</span>
+    </div>
+    <button class="gear-btn" onclick="openSettings()" title="設定">⚙️</button>
   </div>
 
   <div class="segmented-control">
@@ -358,8 +428,13 @@
       <select id="discountSelect" class="input-control">
         <option value="0.2">2 折</option>
         <option value="0.25" selected>2.5 折</option>
+        <option value="0.28">2.8 折</option>
+        <option value="0.3">3 折</option>
+        <option value="0.38">3.8 折</option>
         <option value="0.4">4 折</option>
+        <option value="0.5">5 折</option>
         <option value="0.6">6 折</option>
+        <option value="1.0">無打折 (全額)</option>
       </select>
     </div>
   </div>
@@ -383,12 +458,79 @@
     </div>
   </div>
 
+  <!-- 設定彈窗 (Modal) -->
+  <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <span class="modal-title">⚙️ 偏好設定</span>
+        <button class="close-btn" onclick="closeSettings()">✕</button>
+      </div>
+
+      <div class="input-row">
+        <span class="input-label">手續費最低限制</span>
+        <select id="minFeeSelect" class="input-control">
+          <option value="20" selected>最低 20 元 (標準)</option>
+          <option value="1">最低 1 元 / 無低消</option>
+        </select>
+      </div>
+
+      <div style="margin-top:14px; text-align:right;">
+        <span style="font-size:0.75rem; color:var(--text-muted);">設定會自動儲存於此裝置</span>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const STORAGE_KEY = 'taiwan_stock_calc_pref_v1';
     let currentMode = 'daytrade';
     let currentDirection = 'buy';
+    let minFeeLimit = 20;
+
     let orders = [
       { price: 100, lots: 1 }
     ];
+
+    function loadPreferences() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const pref = JSON.parse(saved);
+          if (pref.discount) document.getElementById('discountSelect').value = pref.discount;
+          if (pref.tickRange) document.getElementById('tickRange').value = pref.tickRange;
+          if (pref.minFee !== undefined) {
+            minFeeLimit = parseInt(pref.minFee, 10);
+            document.getElementById('minFeeSelect').value = minFeeLimit;
+          }
+          if (pref.mode) currentMode = pref.mode;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function savePreferences() {
+      try {
+        const pref = {
+          discount: document.getElementById('discountSelect').value,
+          tickRange: document.getElementById('tickRange').value,
+          minFee: document.getElementById('minFeeSelect').value,
+          mode: currentMode
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(pref));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function openSettings() {
+      document.getElementById('settingsModal').style.display = 'flex';
+    }
+
+    function closeSettings(e) {
+      if (!e || e.target.id === 'settingsModal' || e.target.classList.contains('close-btn')) {
+        document.getElementById('settingsModal').style.display = 'none';
+      }
+    }
 
     function setMode(mode) {
       currentMode = mode;
@@ -404,6 +546,7 @@
         currentDirection = 'buy';
       }
 
+      savePreferences();
       updateDirectionUI();
       renderTable();
     }
@@ -527,8 +670,8 @@
 
       const buyAmt = buyPrice * shares;
       const sellAmt = sellPrice * shares;
-      const buyFee = Math.max(20, Math.floor(buyAmt * 0.001425 * discount));
-      const sellFee = Math.max(20, Math.floor(sellAmt * 0.001425 * discount));
+      const buyFee = Math.max(minFeeLimit, Math.floor(buyAmt * 0.001425 * discount));
+      const sellFee = Math.max(minFeeLimit, Math.floor(sellAmt * 0.001425 * discount));
       const tax = Math.floor(sellAmt * taxRate);
       const totalCost = buyFee + sellFee + tax;
       const netProfit = sellAmt - buyAmt - totalCost;
@@ -693,8 +836,8 @@
             <div class="summary-value">${getTickSize(inputPrice)} 元</div>
           </div>
           <div class="summary-box">
-            <div class="summary-title">模式 / 稅率</div>
-            <div class="summary-value">${isShort ? '先賣後買' : '先買後賣'} ${(taxRate * 100).toFixed(2)}%</div>
+            <div class="summary-title">模式 / 低消</div>
+            <div class="summary-value">${isShort ? '先賣後買' : '先買後賣'} (${minFeeLimit === 1 ? '無低消' : '低消20'})</div>
           </div>
         `;
       }
@@ -705,12 +848,18 @@
           <div class="summary-value highlight-val">${beText}</div>
         </div>
         <div class="summary-box">
-          <div class="summary-title">${isShort ? '賣出總額 (含低消)' : '買進總額 (含低消)'}</div>
+          <div class="summary-title">${isShort ? '賣出總額 (含規費)' : '買進總額 (含規費)'}</div>
           <div class="summary-value">${Math.round(inputPrice * shares).toLocaleString()} 元</div>
         </div>
         ${dynamicBoxes}
       `;
     }
+
+    document.getElementById('minFeeSelect').addEventListener('change', (e) => {
+      minFeeLimit = parseInt(e.target.value, 10);
+      savePreferences();
+      renderTable();
+    });
 
     document.getElementById('enableBasePrice').addEventListener('change', (e) => {
       document.getElementById('basePrice').disabled = !e.target.checked;
@@ -718,13 +867,19 @@
     });
 
     ['basePrice', 'discountSelect', 'tickRange'].forEach(id => {
-      document.getElementById(id).addEventListener('input', renderTable);
-      document.getElementById(id).addEventListener('change', renderTable);
+      document.getElementById(id).addEventListener('input', () => {
+        savePreferences();
+        renderTable();
+      });
+      document.getElementById(id).addEventListener('change', () => {
+        savePreferences();
+        renderTable();
+      });
     });
 
+    loadPreferences();
     renderOrderRows();
-    updateDirectionUI();
-    renderTable();
+    setMode(currentMode);
   </script>
 </body>
 </html>
