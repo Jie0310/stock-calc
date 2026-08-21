@@ -875,7 +875,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v21_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v23_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -906,15 +906,15 @@
     const defaultInventory = [
       {
         id: 'inv_' + Date.now(),
-        symbol: '2330',
-        name: '2330 台積電',
+        symbol: '',
+        name: '自訂持股',
         type: 'swing',
         unit: 'lot',
         currentPrice: null,
         diff: 0,
         diffPercent: 0,
         orders: [
-          { price: 1000, qty: 1 }
+          { price: null, qty: 1 }
         ]
       }
     ];
@@ -1463,7 +1463,7 @@
         let curDown = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
           curDown = stepTick(curDown, -1);
-          downPrices.push({ tickOffset: `-${i}`, price: curDown });
+          downPrices.push({ tickOffset: `-${i}`, price: curDown, isOpen: false });
         }
       }
 
@@ -1690,6 +1690,7 @@
         tabsData[currentTab].name = `${symbol} ${quoteObj.name}`;
         tabsData[currentTab].quote = quoteObj;
 
+        // 計算機模式下：手動同步時若 #1 尚無價格，自動帶入當下現價
         if (isManual && tabsData[currentTab].orders.length > 0 && quoteObj.currentPrice > 0) {
           if (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined) {
             tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
@@ -1793,7 +1794,7 @@
       }
     }
 
-    /* ---------------- 庫存管理核心邏輯（修復輸入失去焦點） ---------------- */
+    /* ---------------- 庫存管理核心邏輯 ---------------- */
 
     function addInventoryStock() {
       const newStock = {
@@ -1838,7 +1839,6 @@
       saveState();
     }
 
-    // 關鍵修正：輸入時只更新數據與數值看板，不銷毀 DOM，保證鍵盤與小數點不中斷
     function updateInvOrder(invIndex, ordIndex, key, val) {
       const inv = inventoryData[invIndex];
       if (key === 'price') {
