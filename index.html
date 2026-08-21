@@ -644,7 +644,7 @@
 
   <div class="card">
     <div class="quote-bar">
-      <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 (如 2330)" maxlength="8" inputmode="text">
+      <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 (如 2330, 1815)" maxlength="8" inputmode="text">
       <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote(true)">同步</button>
     </div>
 
@@ -745,8 +745,9 @@
       <div class="input-row">
         <span class="input-label">更新頻率</span>
         <select id="refreshIntervalSelect" class="input-control" onchange="handleIntervalChange(this.value)">
+          <option value="1000">每 1 秒 (極速)</option>
           <option value="3000">每 3 秒</option>
-          <option value="5000" selected>每 5 秒 (推薦)</option>
+          <option value="5000" selected>每 5 秒 (穩定推薦)</option>
           <option value="10000">每 10 秒</option>
           <option value="30000">每 30 秒</option>
         </select>
@@ -823,7 +824,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v12_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v14_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
@@ -1462,7 +1463,7 @@
       const symbol = input.value.trim().toUpperCase();
 
       if (!symbol) {
-        if (isManual) alert('請先輸入台股股票代號（例如 2330 或 3324）');
+        if (isManual) alert('請先輸入台股股票代號（例如 2330 或 1815）');
         tabsData[currentTab].symbol = '';
         tabsData[currentTab].quote = null;
         renderQuoteBanner(null);
@@ -1489,7 +1490,8 @@
           throw new Error('查無此股票資料');
         }
 
-        const stock = data.msgArray[0];
+        let stock = data.msgArray.find(s => s.n && s.n.trim() !== '') || data.msgArray[0];
+
         const name = stock.n || symbol;
         const prevClose = parseFloat(stock.y) || 0;
         let currentPrice = parseFloat(stock.z);
@@ -1501,7 +1503,7 @@
         }
 
         const openPrice = parseFloat(stock.o) || prevClose;
-        const diff = currentPrice - prevClose;
+        const diff = (currentPrice && prevClose) ? (currentPrice - prevClose) : 0;
         const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
         const time = stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false });
 
@@ -1524,7 +1526,7 @@
         const quoteObj = {
           symbol,
           name,
-          currentPrice,
+          currentPrice: currentPrice || prevClose,
           openPrice,
           prevClose,
           diff,
