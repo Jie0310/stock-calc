@@ -349,11 +349,6 @@
       -webkit-appearance: none;
       appearance: none;
     }
-    .input-control:disabled {
-      opacity: 0.35;
-      background: #1a1a1c;
-      color: #636366;
-    }
     select.input-control {
       text-align-last: right;
       padding-right: 18px;
@@ -361,12 +356,6 @@
       background-repeat: no-repeat;
       background-position: right 6px center;
       background-size: 12px;
-    }
-    .custom-checkbox {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--primary);
-      cursor: pointer;
     }
     .unit-switch {
       display: inline-flex;
@@ -693,15 +682,7 @@
       </table>
     </div>
 
-    <div class="input-row">
-      <span class="input-label">
-        <input type="checkbox" id="enableBasePrice" class="custom-checkbox">
-        開盤價格 (元)
-      </span>
-      <input type="number" id="basePrice" class="input-control" placeholder="開盤價" min="0.01" max="30000" step="any" inputmode="decimal" disabled>
-    </div>
-
-    <div style="padding-top: 8px;">
+    <div style="padding-top: 4px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <div style="display:flex; align-items:center; gap:6px;">
           <span class="input-label">下單明細</span>
@@ -845,7 +826,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v16_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v17_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
@@ -867,9 +848,9 @@
     };
 
     const defaultTabsData = [
-      { name: '標的 1', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], basePrice: null, enableBase: false, quote: null },
-      { name: '標的 2', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], basePrice: null, enableBase: false, quote: null },
-      { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], basePrice: null, enableBase: false, quote: null }
+      { name: '標的 1', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null },
+      { name: '標的 2', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null },
+      { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null }
     ];
 
     let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
@@ -1070,10 +1051,6 @@
         data.direction = 'buy';
       }
 
-      document.getElementById('enableBasePrice').checked = data.enableBase;
-      document.getElementById('basePrice').disabled = !data.enableBase;
-      document.getElementById('basePrice').value = (data.basePrice !== null && data.basePrice !== undefined) ? data.basePrice : '';
-
       const unitSwitch = document.getElementById('unitSwitch');
       if (data.mode === 'swing') {
         unitSwitch.style.display = 'inline-flex';
@@ -1169,7 +1146,7 @@
       const data = tabsData[currentTab];
       let cur = data.orders[idx].price;
       if (cur === null || cur === undefined || isNaN(cur) || cur <= 0) {
-        cur = (data.basePrice && data.basePrice > 0) ? data.basePrice : 100;
+        cur = (data.quote && data.quote.openPrice > 0) ? data.quote.openPrice : 100;
       }
       const next = stepTick(cur, direction);
       data.orders[idx].price = next;
@@ -1210,7 +1187,7 @@
           
           <div class="stepper-group">
             <button class="stepper-btn" type="button" onclick="stepPrice(${idx}, -1)">−</button>
-            <input type="number" class="order-input" placeholder="自填價格" value="${priceVal}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
+            <input type="number" class="order-input" placeholder="價格" value="${priceVal}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
             <button class="stepper-btn" type="button" onclick="stepPrice(${idx}, 1)">+</button>
           </div>
 
@@ -1301,12 +1278,14 @@
       const data = tabsData[currentTab];
       const isShort = data.mode === 'daytrade' && data.direction === 'sell';
       const isOdd = data.unit === 'odd' && data.mode === 'swing';
-      const isBaseEnabled = data.enableBase;
-      const basePrice = data.basePrice;
       const discount = currentDiscount;
       const taxRate = getTaxRate(data.mode);
 
-      document.getElementById('tickRangeRow').style.display = isBaseEnabled ? 'none' : 'flex';
+      const hasLiveQuote = !!(data.quote && (data.quote.openPrice > 0 || data.quote.prevClose > 0));
+      const baseStockPrice = hasLiveQuote ? (data.quote.openPrice || data.quote.prevClose) : null;
+
+      // 只要有代號/即時行情，就不需要手動選 tick 範圍（直接展開到漲跌停）
+      document.getElementById('tickRangeRow').style.display = hasLiveQuote ? 'none' : 'flex';
 
       document.getElementById('thCost').style.display = displayConfig.colCost ? '' : 'none';
       document.getElementById('thProfit').style.display = displayConfig.colProfit ? '' : 'none';
@@ -1329,8 +1308,8 @@
       let calcPrice = null;
       if (hasValidOrderPrice && totalVal > 0) {
         calcPrice = totalVal / (data.orders.filter(o => o.price > 0).reduce((sum, o) => sum + o.qty, 0) || 1);
-      } else if (isBaseEnabled && basePrice && basePrice > 0) {
-        calcPrice = basePrice;
+      } else if (hasLiveQuote) {
+        calcPrice = baseStockPrice;
       }
 
       const totalShares = isOdd ? Math.round(totalQty || 1000) : Math.round((totalQty || 1) * 1000);
@@ -1339,16 +1318,14 @@
         document.getElementById('avgDisplay').innerText = data.orders.length > 1 
           ? `均價 ${calcPrice.toFixed(2)} 元 (${isOdd ? totalShares + '股' : totalQty + '張'})` 
           : `${isOdd ? totalShares + ' 股' : totalQty + ' 張 (' + totalShares + '股)'}`;
-      } else if (isBaseEnabled && basePrice > 0) {
-        document.getElementById('avgDisplay').innerText = `暫採開盤價 ${basePrice.toFixed(2)} 試算`;
       } else {
-        document.getElementById('avgDisplay').innerText = '請輸入下單價格';
+        document.getElementById('avgDisplay').innerText = '';
       }
 
       const tbody = document.getElementById('tickTableBody');
 
       if (!calcPrice || calcPrice <= 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding: 24px 0;">請在上方輸入下單價格，或勾選開盤價格以展開檔位表</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding: 24px 0;">請輸入股票代號同步行情，或填入下單價格以計算檔位</td></tr>`;
         document.getElementById('summaryGrid').style.display = 'none';
         return;
       }
@@ -1358,9 +1335,9 @@
       let upLimit = 0;
       let downLimit = 0;
 
-      if (isBaseEnabled && !isNaN(basePrice) && basePrice > 0) {
-        upLimit = getLimitPrice(basePrice, 1);
-        downLimit = getLimitPrice(basePrice, -1);
+      if (hasLiveQuote && baseStockPrice > 0) {
+        upLimit = getLimitPrice(baseStockPrice, 1);
+        downLimit = getLimitPrice(baseStockPrice, -1);
 
         let curUp = calcPrice;
         let upCount = 0;
@@ -1396,7 +1373,7 @@
       if (hasValidOrderPrice) {
         baseLabel = data.orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進');
       } else {
-        baseLabel = '開盤基準';
+        baseLabel = '開盤';
       }
 
       const list = [
@@ -1483,7 +1460,7 @@
         `;
       }
 
-      if (isBaseEnabled && !isNaN(basePrice) && basePrice > 0) {
+      if (hasLiveQuote && baseStockPrice > 0) {
         if (displayConfig.summaryTick) {
           summaryHtml += `
             <div class="summary-box">
@@ -1536,6 +1513,7 @@
         renderQuoteBanner(null);
         restartAutoRefresh();
         saveState();
+        renderTable();
         return;
       }
 
@@ -1607,11 +1585,6 @@
         tabsData[currentTab].name = `${symbol} ${name}`;
         tabsData[currentTab].quote = quoteObj;
 
-        if (openPrice > 0) {
-          tabsData[currentTab].basePrice = openPrice;
-          document.getElementById('basePrice').value = openPrice;
-        }
-
         updateTabTitles();
         renderQuoteBanner(quoteObj);
         renderTable();
@@ -1637,6 +1610,7 @@
       updateTabTitles();
       renderQuoteBanner(null);
       restartAutoRefresh();
+      renderTable();
       saveState();
     }
 
@@ -1757,20 +1731,6 @@
       renderTable();
     });
 
-    document.getElementById('enableBasePrice').addEventListener('change', (e) => {
-      tabsData[currentTab].enableBase = e.target.checked;
-      document.getElementById('basePrice').disabled = !e.target.checked;
-      saveState();
-      renderTable();
-    });
-
-    document.getElementById('basePrice').addEventListener('input', (e) => {
-      const val = e.target.value.trim();
-      tabsData[currentTab].basePrice = (val === '') ? null : parseFloat(val);
-      saveState();
-      renderTable();
-    });
-
     document.getElementById('tickRange').addEventListener('change', () => {
       saveState();
       renderTable();
@@ -1783,6 +1743,7 @@
         tabsData[currentTab].quote = null;
         renderQuoteBanner(null);
         restartAutoRefresh();
+        renderTable();
         saveState();
       }
     });
