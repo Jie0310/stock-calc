@@ -430,6 +430,8 @@
       border-radius: 16px;
       width: 100%;
       max-width: 360px;
+      max-height: 85vh;
+      overflow-y: auto;
       padding: 16px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
@@ -444,6 +446,14 @@
     .modal-title {
       font-size: 1.1rem;
       font-weight: 700;
+    }
+    .modal-section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 14px 0 6px 0;
     }
     .close-btn {
       background: var(--card-inner);
@@ -555,9 +565,9 @@
           <tr>
             <th class="text-center">檔位</th>
             <th id="thPriceLabel">出場價格</th>
-            <th>總成本</th>
-            <th>淨損益</th>
-            <th>報酬率</th>
+            <th id="thCost">總成本</th>
+            <th id="thProfit">淨損益</th>
+            <th id="thRoi">報酬率</th>
           </tr>
         </thead>
         <tbody id="tickTableBody"></tbody>
@@ -572,6 +582,7 @@
         <button class="close-btn" onclick="closeSettings()">✕</button>
       </div>
 
+      <div class="modal-section-title">手續費與交易規則</div>
       <div class="input-row">
         <span class="input-label">手續費折讓</span>
         <select id="discountSelect" class="input-control" onchange="handleDiscountPresetChange(this.value)">
@@ -601,6 +612,38 @@
         </select>
       </div>
 
+      <div class="modal-section-title">摘要資訊卡顯示開關</div>
+      <div class="input-row">
+        <span class="input-label">保本出場所需</span>
+        <input type="checkbox" id="showSummaryBreakeven" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+      <div class="input-row">
+        <span class="input-label">總額 (含規費)</span>
+        <input type="checkbox" id="showSummaryTotal" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+      <div class="input-row">
+        <span class="input-label">跳動單位 / 開盤漲停</span>
+        <input type="checkbox" id="showSummaryTick" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+      <div class="input-row">
+        <span class="input-label">模式與稅率 / 開盤跌停</span>
+        <input type="checkbox" id="showSummaryRate" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+
+      <div class="modal-section-title">檔位表格欄位顯示開關</div>
+      <div class="input-row">
+        <span class="input-label">總成本 欄位</span>
+        <input type="checkbox" id="showColCost" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+      <div class="input-row">
+        <span class="input-label">淨損益 欄位</span>
+        <input type="checkbox" id="showColProfit" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+      <div class="input-row">
+        <span class="input-label">報酬率 欄位</span>
+        <input type="checkbox" id="showColRoi" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
+
       <button class="reset-btn" type="button" onclick="resetAllTabs()">一鍵重置所有標的暫存</button>
 
       <div style="margin-top:10px; text-align:right;">
@@ -610,11 +653,21 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v4_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v5_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
     let currentDiscount = 0.25;
+
+    let displayConfig = {
+      summaryBreakeven: true,
+      summaryTotal: true,
+      summaryTick: true,
+      summaryRate: true,
+      colCost: true,
+      colProfit: true,
+      colRoi: true
+    };
 
     const defaultTabsData = [
       { name: '標的 1', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false },
@@ -640,10 +693,36 @@
             currentDiscount = parseFloat(parsed.discount);
             applyDiscountToUI(currentDiscount);
           }
+          if (parsed.displayConfig) {
+            displayConfig = Object.assign(displayConfig, parsed.displayConfig);
+          }
         }
       } catch (e) {
         console.error(e);
       }
+      syncDisplayTogglesUI();
+    }
+
+    function syncDisplayTogglesUI() {
+      document.getElementById('showSummaryBreakeven').checked = displayConfig.summaryBreakeven;
+      document.getElementById('showSummaryTotal').checked = displayConfig.summaryTotal;
+      document.getElementById('showSummaryTick').checked = displayConfig.summaryTick;
+      document.getElementById('showSummaryRate').checked = displayConfig.summaryRate;
+      document.getElementById('showColCost').checked = displayConfig.colCost;
+      document.getElementById('showColProfit').checked = displayConfig.colProfit;
+      document.getElementById('showColRoi').checked = displayConfig.colRoi;
+    }
+
+    function handleDisplayToggle() {
+      displayConfig.summaryBreakeven = document.getElementById('showSummaryBreakeven').checked;
+      displayConfig.summaryTotal = document.getElementById('showSummaryTotal').checked;
+      displayConfig.summaryTick = document.getElementById('showSummaryTick').checked;
+      displayConfig.summaryRate = document.getElementById('showSummaryRate').checked;
+      displayConfig.colCost = document.getElementById('showColCost').checked;
+      displayConfig.colProfit = document.getElementById('showColProfit').checked;
+      displayConfig.colRoi = document.getElementById('showColRoi').checked;
+      saveState();
+      renderTable();
     }
 
     function applyDiscountToUI(val) {
@@ -693,7 +772,8 @@
           currentTab: currentTab,
           discount: currentDiscount,
           tickRange: document.getElementById('tickRange').value,
-          minFee: minFeeLimit
+          minFee: minFeeLimit,
+          displayConfig: displayConfig
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       } catch (e) {
@@ -975,6 +1055,11 @@
 
       document.getElementById('tickRangeRow').style.display = isBaseEnabled ? 'none' : 'flex';
 
+      // 表格欄位開關
+      document.getElementById('thCost').style.display = displayConfig.colCost ? '' : 'none';
+      document.getElementById('thProfit').style.display = displayConfig.colProfit ? '' : 'none';
+      document.getElementById('thRoi').style.display = displayConfig.colRoi ? '' : 'none';
+
       let totalVal = 0;
       let totalQty = 0;
       data.orders.forEach(item => {
@@ -1071,12 +1156,16 @@
         if (item.isLimitUp) tag += ' (漲停)';
         if (item.isLimitDown) tag += ' (跌停)';
 
+        let costTd = displayConfig.colCost ? `<td class="muted-text">${res.totalCost.toLocaleString()}</td>` : '';
+        let profitTd = displayConfig.colProfit ? `<td class="${profitClass}">${profitSign}${res.netProfit.toLocaleString()}</td>` : '';
+        let roiTd = displayConfig.colRoi ? `<td class="${profitClass}">${profitSign}${res.roi}%</td>` : '';
+
         tr.innerHTML = `
           <td class="text-center ${item.isBaseRow ? '' : 'muted-text'}">${tag}</td>
           <td><strong>${item.price.toFixed(2)}</strong></td>
-          <td class="muted-text">${res.totalCost.toLocaleString()}</td>
-          <td class="${profitClass}">${profitSign}${res.netProfit.toLocaleString()}</td>
-          <td class="${profitClass}">${profitSign}${res.roi}%</td>
+          ${costTd}
+          ${profitTd}
+          ${roiTd}
         `;
         tbody.appendChild(tr);
       });
@@ -1094,42 +1183,65 @@
         }
       }
 
-      let dynamicBoxes = '';
-      if (isBaseEnabled && !isNaN(basePrice) && basePrice > 0) {
-        dynamicBoxes = `
+      let summaryHtml = '';
+
+      if (displayConfig.summaryBreakeven) {
+        summaryHtml += `
           <div class="summary-box">
-            <div class="summary-title">開盤漲停價 (+10%)</div>
-            <div class="summary-value highlight-val">${upLimit.toFixed(2)} 元</div>
-          </div>
-          <div class="summary-box">
-            <div class="summary-title">開盤跌停價 (-10%)</div>
-            <div class="summary-value highlight-down">${downLimit.toFixed(2)} 元</div>
-          </div>
-        `;
-      } else {
-        dynamicBoxes = `
-          <div class="summary-box">
-            <div class="summary-title">當前跳動單位</div>
-            <div class="summary-value">${getTickSize(inputPrice)} 元</div>
-          </div>
-          <div class="summary-box">
-            <div class="summary-title">折讓 / 稅率</div>
-            <div class="summary-value">${(discount * 10).toFixed(1)}折 / ${(taxRate * 100).toFixed(2)}%</div>
+            <div class="summary-title">保本出場所需</div>
+            <div class="summary-value highlight-val">${beText}</div>
           </div>
         `;
       }
 
-      document.getElementById('summaryGrid').innerHTML = `
-        <div class="summary-box">
-          <div class="summary-title">保本出場所需</div>
-          <div class="summary-value highlight-val">${beText}</div>
-        </div>
-        <div class="summary-box">
-          <div class="summary-title">${isShort ? '賣出總額 (含規費)' : '買進總額 (含規費)'}</div>
-          <div class="summary-value">${Math.round(inputPrice * totalShares).toLocaleString()} 元</div>
-        </div>
-        ${dynamicBoxes}
-      `;
+      if (displayConfig.summaryTotal) {
+        summaryHtml += `
+          <div class="summary-box">
+            <div class="summary-title">${isShort ? '賣出總額 (含規費)' : '買進總額 (含規費)'}</div>
+            <div class="summary-value">${Math.round(inputPrice * totalShares).toLocaleString()} 元</div>
+          </div>
+        `;
+      }
+
+      if (isBaseEnabled && !isNaN(basePrice) && basePrice > 0) {
+        if (displayConfig.summaryTick) {
+          summaryHtml += `
+            <div class="summary-box">
+              <div class="summary-title">開盤漲停價 (+10%)</div>
+              <div class="summary-value highlight-val">${upLimit.toFixed(2)} 元</div>
+            </div>
+          `;
+        }
+        if (displayConfig.summaryRate) {
+          summaryHtml += `
+            <div class="summary-box">
+              <div class="summary-title">開盤跌停價 (-10%)</div>
+              <div class="summary-value highlight-down">${downLimit.toFixed(2)} 元</div>
+            </div>
+          `;
+        }
+      } else {
+        if (displayConfig.summaryTick) {
+          summaryHtml += `
+            <div class="summary-box">
+              <div class="summary-title">當前跳動單位</div>
+              <div class="summary-value">${getTickSize(inputPrice)} 元</div>
+            </div>
+          `;
+        }
+        if (displayConfig.summaryRate) {
+          summaryHtml += `
+            <div class="summary-box">
+              <div class="summary-title">折讓 / 稅率</div>
+              <div class="summary-value">${(discount * 10).toFixed(1)}折 / ${(taxRate * 100).toFixed(2)}%</div>
+            </div>
+          `;
+        }
+      }
+
+      const summaryGrid = document.getElementById('summaryGrid');
+      summaryGrid.innerHTML = summaryHtml;
+      summaryGrid.style.display = summaryHtml.trim() === '' ? 'none' : 'grid';
     }
 
     function openSettings() {
