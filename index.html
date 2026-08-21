@@ -196,14 +196,14 @@
       background: var(--primary);
       color: #ffffff;
       border: none;
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 8px;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 4px;
+      justify-content: center;
       white-space: nowrap;
     }
     .quote-btn:disabled {
@@ -255,7 +255,6 @@
       100% { transform: scale(0.95); opacity: 0.5; }
     }
 
-    /* 最佳五檔樣式 */
     .five-order-card {
       background: #141416;
       border: 1px solid var(--border);
@@ -646,9 +645,7 @@
   <div class="card">
     <div class="quote-bar">
       <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 (如 2330)" maxlength="8" inputmode="text">
-      <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote(true)">
-        <span>📡</span> 抓即時
-      </button>
+      <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote(true)">同步</button>
     </div>
 
     <div class="quote-info-box" id="quoteInfoBox" style="display:none;">
@@ -665,7 +662,6 @@
       </div>
     </div>
 
-    <!-- 最佳五檔掛單卡片 -->
     <div class="five-order-card" id="fiveOrderCard" style="display:none;">
       <div class="five-order-header">
         <span>買進五檔 (委買)</span>
@@ -827,7 +823,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v9_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v12_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
@@ -1464,8 +1460,14 @@
       if (isFetching) return;
       const input = document.getElementById('quoteSymbolInput');
       const symbol = input.value.trim().toUpperCase();
+
       if (!symbol) {
         if (isManual) alert('請先輸入台股股票代號（例如 2330 或 3324）');
+        tabsData[currentTab].symbol = '';
+        tabsData[currentTab].quote = null;
+        renderQuoteBanner(null);
+        restartAutoRefresh();
+        saveState();
         return;
       }
 
@@ -1473,7 +1475,7 @@
       const btn = document.getElementById('fetchQuoteBtn');
       if (isManual) {
         btn.disabled = true;
-        btn.innerHTML = '連線中...';
+        btn.innerText = '連線中...';
       }
 
       try {
@@ -1503,7 +1505,6 @@
         const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
         const time = stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false });
 
-        // 解析最佳五檔
         const parseFiveList = (pStr, vStr) => {
           const prices = (pStr || '').split('_').filter(v => v !== '');
           const vols = (vStr || '').split('_').filter(v => v !== '');
@@ -1517,8 +1518,8 @@
           return list;
         };
 
-        const bids = parseFiveList(stock.b, stock.g); // 委買價與量
-        const asks = parseFiveList(stock.a, stock.f); // 委賣價與量
+        const bids = parseFiveList(stock.b, stock.g);
+        const asks = parseFiveList(stock.a, stock.f);
 
         const quoteObj = {
           symbol,
@@ -1537,8 +1538,14 @@
         tabsData[currentTab].name = `${symbol} ${name}`;
         tabsData[currentTab].quote = quoteObj;
 
+        if (openPrice > 0) {
+          tabsData[currentTab].basePrice = openPrice;
+          document.getElementById('basePrice').value = openPrice;
+        }
+
         updateTabTitles();
         renderQuoteBanner(quoteObj);
+        renderTable();
         saveState();
 
       } catch (err) {
@@ -1548,7 +1555,7 @@
         isFetching = false;
         if (isManual) {
           btn.disabled = false;
-          btn.innerHTML = '<span>📡</span> 抓即時';
+          btn.innerText = '同步';
         }
       }
     }
@@ -1573,7 +1580,7 @@
       const fiveCard = document.getElementById('fiveOrderCard');
       const liveDot = document.getElementById('liveDot');
 
-      if (!q) {
+      if (!q || !tabsData[currentTab].symbol) {
         box.style.display = 'none';
         fiveCard.style.display = 'none';
         return;
@@ -1594,7 +1601,6 @@
       liveDot.style.display = autoRefresh ? 'inline-block' : 'none';
       document.getElementById('quoteTimeText').innerText = `${q.time}`;
 
-      // 渲染五檔
       if (showFiveOrder && q.bids && q.asks) {
         fiveCard.style.display = 'block';
         const tbody = document.getElementById('fiveOrderBody');
@@ -1632,7 +1638,7 @@
       if (!autoRefresh) return;
 
       const symbol = tabsData[currentTab].symbol;
-      if (symbol) {
+      if (symbol && symbol.trim() !== '') {
         refreshTimer = setInterval(() => {
           if (tabsData[currentTab].symbol && !document.hidden) {
             fetchLiveQuote(false);
@@ -1687,6 +1693,17 @@
     document.getElementById('tickRange').addEventListener('change', () => {
       saveState();
       renderTable();
+    });
+
+    document.getElementById('quoteSymbolInput').addEventListener('input', (e) => {
+      const val = e.target.value.trim().toUpperCase();
+      if (!val) {
+        tabsData[currentTab].symbol = '';
+        tabsData[currentTab].quote = null;
+        renderQuoteBanner(null);
+        restartAutoRefresh();
+        saveState();
+      }
     });
 
     document.getElementById('quoteSymbolInput').addEventListener('keydown', (e) => {
