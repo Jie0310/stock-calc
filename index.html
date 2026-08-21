@@ -173,7 +173,6 @@
       margin-bottom: 12px;
     }
 
-    /* 即時行情查詢卡 */
     .quote-bar {
       display: flex;
       gap: 6px;
@@ -225,6 +224,35 @@
       font-weight: 700;
       color: var(--text);
       font-size: 0.9rem;
+    }
+    .fill-price-btn {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      color: var(--primary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    .fill-price-btn:active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--loss);
+      margin-right: 4px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.5; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.5; }
     }
 
     .input-row {
@@ -576,21 +604,25 @@
   </div>
 
   <div class="card">
-    <!-- 即時行情查詢欄 -->
     <div class="quote-bar">
       <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 (如 2330)" maxlength="8" inputmode="text">
-      <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote()">
+      <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote(true)">
         <span>📡</span> 抓即時
       </button>
     </div>
 
-    <!-- 即時行情資訊標籤 -->
     <div class="quote-info-box" id="quoteInfoBox" style="display:none;">
       <div>
         <span class="quote-stock-name" id="quoteStockName">--</span>
         <span id="quotePriceDiff" style="margin-left:6px; font-weight:700;">--</span>
       </div>
-      <div style="color:var(--text-muted); font-size:0.72rem;" id="quoteTime">--:--</div>
+      <div style="display:flex; align-items:center;">
+        <div style="color:var(--text-muted); font-size:0.72rem; display:flex; align-items:center;" id="quoteTime">
+          <span class="pulse-dot" id="liveDot" style="display:none;"></span>
+          <span id="quoteTimeText">--:--</span>
+        </div>
+        <button type="button" class="fill-price-btn" id="fillPriceBtn" onclick="applyQuotePriceToOrder()" title="將現價帶入第1筆下單">帶入 #1</button>
+      </div>
     </div>
 
     <div class="input-row">
@@ -652,6 +684,21 @@
       <div class="modal-header">
         <span class="modal-title">⚙️ 偏好設定</span>
         <button class="close-btn" onclick="closeSettings()">✕</button>
+      </div>
+
+      <div class="modal-section-title">即時行情自動更新</div>
+      <div class="input-row">
+        <span class="input-label">開盤即時自動更新</span>
+        <input type="checkbox" id="autoRefreshToggle" class="custom-checkbox" checked onchange="handleAutoRefreshToggle()">
+      </div>
+      <div class="input-row">
+        <span class="input-label">更新頻率</span>
+        <select id="refreshIntervalSelect" class="input-control" onchange="handleIntervalChange(this.value)">
+          <option value="3000">每 3 秒</option>
+          <option value="5000" selected>每 5 秒 (推薦)</option>
+          <option value="10000">每 10 秒</option>
+          <option value="30000">每 30 秒</option>
+        </select>
       </div>
 
       <div class="modal-section-title">手續費與交易規則</div>
@@ -725,11 +772,15 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v6_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v8_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
     let currentDiscount = 0.25;
+    let autoRefresh = true;
+    let refreshInterval = 5000;
+    let refreshTimer = null;
+    let isFetching = false;
 
     let displayConfig = {
       summaryBreakeven: true,
@@ -765,6 +816,14 @@
             currentDiscount = parseFloat(parsed.discount);
             applyDiscountToUI(currentDiscount);
           }
+          if (parsed.autoRefresh !== undefined) {
+            autoRefresh = parsed.autoRefresh;
+            document.getElementById('autoRefreshToggle').checked = autoRefresh;
+          }
+          if (parsed.refreshInterval !== undefined) {
+            refreshInterval = parseInt(parsed.refreshInterval, 10);
+            document.getElementById('refreshIntervalSelect').value = refreshInterval;
+          }
           if (parsed.displayConfig) {
             displayConfig = Object.assign(displayConfig, parsed.displayConfig);
           }
@@ -795,6 +854,18 @@
       displayConfig.colRoi = document.getElementById('showColRoi').checked;
       saveState();
       renderTable();
+    }
+
+    function handleAutoRefreshToggle() {
+      autoRefresh = document.getElementById('autoRefreshToggle').checked;
+      saveState();
+      restartAutoRefresh();
+    }
+
+    function handleIntervalChange(val) {
+      refreshInterval = parseInt(val, 10);
+      saveState();
+      restartAutoRefresh();
     }
 
     function applyDiscountToUI(val) {
@@ -845,6 +916,8 @@
           discount: currentDiscount,
           tickRange: document.getElementById('tickRange').value,
           minFee: minFeeLimit,
+          autoRefresh: autoRefresh,
+          refreshInterval: refreshInterval,
           displayConfig: displayConfig
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -860,6 +933,7 @@
       });
       syncUIFromCurrentTab();
       saveState();
+      restartAutoRefresh();
     }
 
     function renameTab(e, index) {
@@ -1318,18 +1392,22 @@
       summaryGrid.style.display = summaryHtml.trim() === '' ? 'none' : 'grid';
     }
 
-    /* 即時行情串接邏輯 */
-    async function fetchLiveQuote() {
+    /* 即時行情只更新資訊卡，不覆蓋下單輸入框 */
+    async function fetchLiveQuote(isManual = false) {
+      if (isFetching) return;
       const input = document.getElementById('quoteSymbolInput');
       const symbol = input.value.trim().toUpperCase();
       if (!symbol) {
-        alert('請先輸入台股股票代號（例如 2330 或 3324）');
+        if (isManual) alert('請先輸入台股股票代號（例如 2330 或 3324）');
         return;
       }
 
+      isFetching = true;
       const btn = document.getElementById('fetchQuoteBtn');
-      btn.disabled = true;
-      btn.innerHTML = '連線中...';
+      if (isManual) {
+        btn.disabled = true;
+        btn.innerHTML = '連線中...';
+      }
 
       try {
         const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${symbol}.tw|otc_${symbol}.tw&json=1&delay=0&_=${Date.now()}`;
@@ -1373,29 +1451,35 @@
         tabsData[currentTab].name = `${symbol} ${name}`;
         tabsData[currentTab].quote = quoteObj;
 
-        // 自動帶入價格與開盤價
-        if (tabsData[currentTab].orders.length > 0) {
-          tabsData[currentTab].orders[0].price = currentPrice;
-        }
-        tabsData[currentTab].basePrice = openPrice > 0 ? openPrice : currentPrice;
-
         updateTabTitles();
         renderQuoteBanner(quoteObj);
-        renderOrderRows();
-        renderTable();
         saveState();
 
       } catch (err) {
         console.error(err);
-        alert('抓取即時行情失敗，請確認代號正確或網路連線正常。');
+        if (isManual) alert('抓取即時行情失敗，請確認代號正確或網路連線正常。');
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span>📡</span> 抓即時';
+        isFetching = false;
+        if (isManual) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>📡</span> 抓即時';
+        }
+      }
+    }
+
+    function applyQuotePriceToOrder() {
+      const q = tabsData[currentTab].quote;
+      if (q && q.currentPrice && tabsData[currentTab].orders.length > 0) {
+        tabsData[currentTab].orders[0].price = q.currentPrice;
+        renderOrderRows();
+        renderTable();
+        saveState();
       }
     }
 
     function renderQuoteBanner(q) {
       const box = document.getElementById('quoteInfoBox');
+      const liveDot = document.getElementById('liveDot');
       if (!q) {
         box.style.display = 'none';
         return;
@@ -1412,7 +1496,26 @@
       
       diffEl.style.color = color;
       diffEl.innerText = `${sign}${q.diff.toFixed(2)} (${sign}${q.diffPercent.toFixed(2)}%)`;
-      document.getElementById('quoteTime').innerText = `更新 ${q.time}`;
+      
+      liveDot.style.display = autoRefresh ? 'inline-block' : 'none';
+      document.getElementById('quoteTimeText').innerText = `${q.time}`;
+    }
+
+    function restartAutoRefresh() {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+      if (!autoRefresh) return;
+
+      const symbol = tabsData[currentTab].symbol;
+      if (symbol) {
+        refreshTimer = setInterval(() => {
+          if (tabsData[currentTab].symbol && !document.hidden) {
+            fetchLiveQuote(false);
+          }
+        }, refreshInterval);
+      }
     }
 
     function openSettings() {
@@ -1434,6 +1537,7 @@
         });
         saveState();
         syncUIFromCurrentTab();
+        restartAutoRefresh();
         closeSettings();
       }
     }
@@ -1464,7 +1568,14 @@
 
     document.getElementById('quoteSymbolInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        fetchLiveQuote();
+        fetchLiveQuote(true);
+        restartAutoRefresh();
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && autoRefresh && tabsData[currentTab].symbol) {
+        fetchLiveQuote(false);
       }
     });
 
