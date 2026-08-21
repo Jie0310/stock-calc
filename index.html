@@ -875,7 +875,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v26_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v27_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1676,7 +1676,6 @@
         tabsData[currentTab].name = `${symbol} ${quoteObj.name}`;
         tabsData[currentTab].quote = quoteObj;
 
-        // 計算機模式下：手動同步時若 #1 尚無價格，自動帶入當下現價
         if (isManual && tabsData[currentTab].orders.length > 0 && quoteObj.currentPrice > 0) {
           if (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined) {
             tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
@@ -1865,7 +1864,7 @@
           hasValidBuyPrice = true;
           const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
           const amt = ord.price * shares;
-          // 買進手續費：全面依據設定的折讓比率計算
+          // 買進手續費：依據折讓比率計算實際扣款成本 (148500 + 52 = 148552)
           const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
           invTotalBuyAmt += amt;
           invTotalShares += shares;
@@ -1882,8 +1881,8 @@
 
       if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
         marketVal = curPrice * invTotalShares;
-        // 賣出手續費：全面依據設定的折讓比率計算
-        const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
+        // 預估賣出手續費：固定以牌告全額 0.001425 (無折讓 174 元) 預估，精準吻合券商 App
+        const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425));
         const sellTax = Math.floor(marketVal * taxRate);
         const netSellAmt = marketVal - sellFee - sellTax;
         netProfit = netSellAmt - invTotalBuyCost;
