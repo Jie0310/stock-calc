@@ -57,11 +57,13 @@
       letter-spacing: -0.5px;
     }
     .badge {
-      font-size: 0.72rem;
+      font-size: 0.8rem;
+      font-weight: 600;
       color: var(--text-muted);
       background: var(--card-bg);
       padding: 3px 8px;
       border-radius: 6px;
+      font-variant-numeric: tabular-nums;
     }
     .gear-btn {
       background: var(--card-bg);
@@ -208,6 +210,24 @@
     }
     .quote-btn:disabled {
       opacity: 0.5;
+    }
+    .clear-btn {
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+    .clear-btn:active {
+      background: #3a3a3c;
+      color: var(--text);
     }
     .quote-info-box {
       background: rgba(10, 132, 255, 0.1);
@@ -611,7 +631,7 @@
   <div class="header">
     <div class="header-left">
       <h1>台股計算</h1>
-      <span class="badge" id="rateBadge">當沖買進 0.15%</span>
+      <span class="badge" id="clockBadge">--:--:--</span>
     </div>
     <button class="gear-btn" onclick="openSettings()" title="設定">⚙️</button>
   </div>
@@ -644,8 +664,9 @@
 
   <div class="card">
     <div class="quote-bar">
-      <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 (如 2330, 1815)" maxlength="8" inputmode="text">
+      <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 Ex. 2330" maxlength="8" inputmode="text">
       <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote(true)">同步</button>
+      <button type="button" class="clear-btn" id="clearQuoteBtn" onclick="clearQuoteInput()">清除</button>
     </div>
 
     <div class="quote-info-box" id="quoteInfoBox" style="display:none;">
@@ -824,7 +845,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v14_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v15_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
@@ -852,6 +873,17 @@
     ];
 
     let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
+
+    function startLiveClock() {
+      const clockEl = document.getElementById('clockBadge');
+      const updateClock = () => {
+        const now = new Date();
+        const pad = (n) => n.toString().padStart(2, '0');
+        clockEl.innerText = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      };
+      updateClock();
+      setInterval(updateClock, 1000);
+    }
 
     function loadState() {
       try {
@@ -1096,12 +1128,6 @@
         btnSell.className = 'order-btn active-sell';
       }
 
-      const badgeMap = {
-        daytrade: isShort ? '當沖賣出 0.15%' : '當沖買進 0.15%',
-        swing: `波段${data.unit === 'odd' ? '零股' : '買進'} 0.3%`,
-        warrant: '權證買進 0.1%'
-      };
-      document.getElementById('rateBadge').innerText = badgeMap[data.mode];
       document.getElementById('thPriceLabel').innerText = isShort ? '回補價格' : '賣出價格';
     }
 
@@ -1562,6 +1588,17 @@
       }
     }
 
+    function clearQuoteInput() {
+      document.getElementById('quoteSymbolInput').value = '';
+      tabsData[currentTab].symbol = '';
+      tabsData[currentTab].quote = null;
+      tabsData[currentTab].name = `標的 ${currentTab + 1}`;
+      updateTabTitles();
+      renderQuoteBanner(null);
+      restartAutoRefresh();
+      saveState();
+    }
+
     function setOrderPriceDirect(price) {
       if (!price || isNaN(price) || tabsData[currentTab].orders.length === 0) return;
       tabsData[currentTab].orders[0].price = parseFloat(price);
@@ -1723,6 +1760,7 @@
 
     loadState();
     handleTabClick(currentTab);
+    startLiveClock();
   </script>
 </body>
 </html>
