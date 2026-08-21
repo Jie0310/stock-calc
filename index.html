@@ -335,7 +335,7 @@
 
     <div style="padding-top: 8px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-        <span class="input-label" id="entryTitle">下單價格 / 張數明細</span>
+        <span class="input-label">下單價格 / 張數明細</span>
         <span id="avgDisplay" style="font-size:0.75rem; color:var(--primary); font-weight:700;"></span>
       </div>
       <div class="order-list" id="orderList"></div>
@@ -480,18 +480,26 @@
     }
 
     function stepTick(price, direction) {
-      let p = Math.round(price * 100) / 100;
+      let p = Math.round(price * 1000) / 1000;
+      let tick = getTickSize(p);
+
       if (direction > 0) {
-        const tick = getTickSize(p);
-        p = Math.round((p + tick) * 100) / 100;
-      } else if (direction < 0) {
-        let tick = getTickSize(p);
-        let nextP = Math.round((p - tick) * 100) / 100;
-        if (p === 10 || p === 50 || p === 100 || p === 500 || p === 1000) {
-          tick = getTickSize(nextP);
-          nextP = Math.round((p - tick) * 100) / 100;
+        let remainder = Math.round((p % tick) * 1000) / 1000;
+        if (Math.abs(remainder) > 0.0001 && Math.abs(remainder - tick) > 0.0001) {
+          p = Math.floor(p / tick) * tick + tick;
+        } else {
+          p += tick;
         }
-        p = Math.max(0.01, nextP);
+      } else if (direction < 0) {
+        let remainder = Math.round((p % tick) * 1000) / 1000;
+        if (Math.abs(remainder) > 0.0001 && Math.abs(remainder - tick) > 0.0001) {
+          p = Math.floor(p / tick) * tick;
+        } else {
+          let testLower = Math.round((p - 0.001) * 1000) / 1000;
+          tick = getTickSize(testLower);
+          p -= tick;
+        }
+        p = Math.max(0.01, p);
       }
       return Math.round(p * 100) / 100;
     }
