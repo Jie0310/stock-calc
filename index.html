@@ -77,7 +77,6 @@
       justify-content: center;
     }
 
-    /* 多標的分頁列 */
     .tab-bar {
       display: flex;
       gap: 6px;
@@ -246,7 +245,6 @@
       color: #ffffff;
     }
     
-    /* 下單列表與快捷按鈕組 */
     .order-list {
       margin-top: 8px;
       display: flex;
@@ -458,6 +456,22 @@
       font-weight: 700;
       cursor: pointer;
     }
+    .reset-btn {
+      width: 100%;
+      background: rgba(255, 69, 58, 0.15);
+      color: var(--profit);
+      border: 1px solid rgba(255, 69, 58, 0.3);
+      padding: 9px 0;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 14px;
+      transition: background 0.2s;
+    }
+    .reset-btn:active {
+      background: rgba(255, 69, 58, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -470,7 +484,6 @@
     <button class="gear-btn" onclick="openSettings()" title="設定">⚙️</button>
   </div>
 
-  <!-- 多標的分頁列 -->
   <div class="tab-bar">
     <div class="tab-item active" data-tab="0" onclick="handleTabClick(0)">
       <span id="tabName0">標的 1</span>
@@ -510,7 +523,6 @@
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <div style="display:flex; align-items:center; gap:6px;">
           <span class="input-label">下單明細</span>
-          <!-- 波段零股切換開關 -->
           <div class="unit-switch" id="unitSwitch" style="display:none;">
             <div class="unit-switch-btn active" id="unitLotBtn" onclick="setUnitType('lot')">整張</div>
             <div class="unit-switch-btn" id="unitOddBtn" onclick="setUnitType('odd')">零股</div>
@@ -530,21 +542,6 @@
         <option value="15">±15 個 Tick</option>
         <option value="20">±20 個 Tick</option>
         <option value="25">±25 個 Tick</option>
-      </select>
-    </div>
-
-    <div class="input-row">
-      <span class="input-label">手續費折讓</span>
-      <select id="discountSelect" class="input-control">
-        <option value="0.2">2 折</option>
-        <option value="0.25" selected>2.5 折</option>
-        <option value="0.28">2.8 折</option>
-        <option value="0.3">3 折</option>
-        <option value="0.38">3.8 折</option>
-        <option value="0.4">4 折</option>
-        <option value="0.5">5 折</option>
-        <option value="0.6">6 折</option>
-        <option value="1.0">無打折 (全額)</option>
       </select>
     </div>
   </div>
@@ -568,12 +565,32 @@
     </div>
   </div>
 
-  <!-- 設定彈窗 -->
   <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
         <span class="modal-title">⚙️ 偏好設定</span>
         <button class="close-btn" onclick="closeSettings()">✕</button>
+      </div>
+
+      <div class="input-row">
+        <span class="input-label">手續費折讓</span>
+        <select id="discountSelect" class="input-control" onchange="handleDiscountPresetChange(this.value)">
+          <option value="0.2">2 折 (0.20)</option>
+          <option value="0.25" selected>2.5 折 (0.25)</option>
+          <option value="0.28">2.8 折 (0.28)</option>
+          <option value="0.3">3 折 (0.30)</option>
+          <option value="0.38">3.8 折 (0.38)</option>
+          <option value="0.4">4 折 (0.40)</option>
+          <option value="0.5">5 折 (0.50)</option>
+          <option value="0.6">6 折 (0.60)</option>
+          <option value="1.0">無打折 (1.00)</option>
+          <option value="custom">自訂數值</option>
+        </select>
+      </div>
+
+      <div class="input-row" id="customDiscountRow" style="display:none;">
+        <span class="input-label">自訂折讓比率</span>
+        <input type="number" id="customDiscountInput" class="input-control" placeholder="例如 0.18" step="0.01" min="0.01" max="1" inputmode="decimal">
       </div>
 
       <div class="input-row">
@@ -584,23 +601,28 @@
         </select>
       </div>
 
-      <div style="margin-top:14px; text-align:right;">
-        <span style="font-size:0.75rem; color:var(--text-muted);">所有設定與分頁皆已自動儲存</span>
+      <button class="reset-btn" type="button" onclick="resetAllTabs()">一鍵重置所有標的暫存</button>
+
+      <div style="margin-top:10px; text-align:right;">
+        <span style="font-size:0.72rem; color:var(--text-muted);">設定與分頁皆自動儲存於本機</span>
       </div>
     </div>
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v3_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v4_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
+    let currentDiscount = 0.25;
 
-    let tabsData = [
+    const defaultTabsData = [
       { name: '標的 1', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false },
       { name: '標的 2', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 50, qty: 1 }], basePrice: 50, enableBase: false },
       { name: '標的 3', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 200, qty: 1 }], basePrice: 200, enableBase: false }
     ];
+
+    let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
 
     function loadState() {
       try {
@@ -609,11 +631,14 @@
           const parsed = JSON.parse(saved);
           if (parsed.tabsData) tabsData = parsed.tabsData;
           if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
-          if (parsed.discount) document.getElementById('discountSelect').value = parsed.discount;
           if (parsed.tickRange) document.getElementById('tickRange').value = parsed.tickRange;
           if (parsed.minFee !== undefined) {
             minFeeLimit = parseInt(parsed.minFee, 10);
             document.getElementById('minFeeSelect').value = minFeeLimit;
+          }
+          if (parsed.discount !== undefined) {
+            currentDiscount = parseFloat(parsed.discount);
+            applyDiscountToUI(currentDiscount);
           }
         }
       } catch (e) {
@@ -621,12 +646,52 @@
       }
     }
 
+    function applyDiscountToUI(val) {
+      const select = document.getElementById('discountSelect');
+      const customRow = document.getElementById('customDiscountRow');
+      const customInput = document.getElementById('customDiscountInput');
+      
+      const matched = Array.from(select.options).some(opt => opt.value !== 'custom' && parseFloat(opt.value) === val);
+      if (matched) {
+        select.value = val.toString();
+        customRow.style.display = 'none';
+      } else {
+        select.value = 'custom';
+        customRow.style.display = 'flex';
+        customInput.value = val;
+      }
+    }
+
+    function handleDiscountPresetChange(val) {
+      const customRow = document.getElementById('customDiscountRow');
+      const customInput = document.getElementById('customDiscountInput');
+      if (val === 'custom') {
+        customRow.style.display = 'flex';
+        if (!customInput.value) customInput.value = currentDiscount;
+        currentDiscount = parseFloat(customInput.value) || 0.25;
+      } else {
+        customRow.style.display = 'none';
+        currentDiscount = parseFloat(val);
+      }
+      saveState();
+      renderTable();
+    }
+
+    document.getElementById('customDiscountInput').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        currentDiscount = val;
+        saveState();
+        renderTable();
+      }
+    });
+
     function saveState() {
       try {
         const payload = {
           tabsData: tabsData,
           currentTab: currentTab,
-          discount: document.getElementById('discountSelect').value,
+          discount: currentDiscount,
           tickRange: document.getElementById('tickRange').value,
           minFee: minFeeLimit
         };
@@ -905,7 +970,7 @@
       const isOdd = data.unit === 'odd' && data.mode === 'swing';
       const isBaseEnabled = data.enableBase;
       const basePrice = data.basePrice;
-      const discount = parseFloat(document.getElementById('discountSelect').value);
+      const discount = currentDiscount;
       const taxRate = getTaxRate(data.mode);
 
       document.getElementById('tickRangeRow').style.display = isBaseEnabled ? 'none' : 'flex';
@@ -1048,8 +1113,8 @@
             <div class="summary-value">${getTickSize(inputPrice)} 元</div>
           </div>
           <div class="summary-box">
-            <div class="summary-title">交易規格 / 稅率</div>
-            <div class="summary-value">${isOdd ? '零股交易' : (isShort ? '先賣後買' : '現股買進')} ${(taxRate * 100).toFixed(2)}%</div>
+            <div class="summary-title">折讓 / 稅率</div>
+            <div class="summary-value">${(discount * 10).toFixed(1)}折 / ${(taxRate * 100).toFixed(2)}%</div>
           </div>
         `;
       }
@@ -1077,6 +1142,19 @@
       }
     }
 
+    function resetAllTabs() {
+      if (confirm('確定要重置所有標的分頁資料回到預設值嗎？')) {
+        tabsData = JSON.parse(JSON.stringify(defaultTabsData));
+        currentTab = 0;
+        document.querySelectorAll('.tab-item').forEach((tab, i) => {
+          tab.classList.toggle('active', i === 0);
+        });
+        saveState();
+        syncUIFromCurrentTab();
+        closeSettings();
+      }
+    }
+
     document.getElementById('minFeeSelect').addEventListener('change', (e) => {
       minFeeLimit = parseInt(e.target.value, 10);
       saveState();
@@ -1096,11 +1174,9 @@
       renderTable();
     });
 
-    ['discountSelect', 'tickRange'].forEach(id => {
-      document.getElementById(id).addEventListener('change', () => {
-        saveState();
-        renderTable();
-      });
+    document.getElementById('tickRange').addEventListener('change', () => {
+      saveState();
+      renderTable();
     });
 
     loadState();
