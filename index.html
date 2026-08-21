@@ -172,6 +172,61 @@
       padding: 12px 14px;
       margin-bottom: 12px;
     }
+
+    /* 即時行情查詢卡 */
+    .quote-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .quote-input {
+      flex: 1;
+      background: var(--card-inner);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      -webkit-appearance: none;
+    }
+    .quote-btn {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .quote-btn:disabled {
+      opacity: 0.5;
+    }
+    .quote-info-box {
+      background: rgba(10, 132, 255, 0.1);
+      border: 1px solid rgba(10, 132, 255, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      font-size: 0.78rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .quote-stock-name {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
     .input-row {
       display: flex;
       align-items: center;
@@ -521,6 +576,23 @@
   </div>
 
   <div class="card">
+    <!-- 即時行情查詢欄 -->
+    <div class="quote-bar">
+      <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 (如 2330)" maxlength="8" inputmode="text">
+      <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote()">
+        <span>📡</span> 抓即時
+      </button>
+    </div>
+
+    <!-- 即時行情資訊標籤 -->
+    <div class="quote-info-box" id="quoteInfoBox" style="display:none;">
+      <div>
+        <span class="quote-stock-name" id="quoteStockName">--</span>
+        <span id="quotePriceDiff" style="margin-left:6px; font-weight:700;">--</span>
+      </div>
+      <div style="color:var(--text-muted); font-size:0.72rem;" id="quoteTime">--:--</div>
+    </div>
+
     <div class="input-row">
       <span class="input-label">
         <input type="checkbox" id="enableBasePrice" class="custom-checkbox">
@@ -653,7 +725,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v5_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v6_data';
 
     let currentTab = 0;
     let minFeeLimit = 20;
@@ -670,9 +742,9 @@
     };
 
     const defaultTabsData = [
-      { name: '標的 1', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false },
-      { name: '標的 2', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 50, qty: 1 }], basePrice: 50, enableBase: false },
-      { name: '標的 3', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 200, qty: 1 }], basePrice: 200, enableBase: false }
+      { name: '標的 1', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 100, qty: 1 }], basePrice: 100, enableBase: false, quote: null },
+      { name: '標的 2', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 50, qty: 1 }], basePrice: 50, enableBase: false, quote: null },
+      { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: 200, qty: 1 }], basePrice: 200, enableBase: false, quote: null }
     ];
 
     let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
@@ -811,6 +883,9 @@
     function syncUIFromCurrentTab() {
       const data = tabsData[currentTab];
       updateTabTitles();
+
+      document.getElementById('quoteSymbolInput').value = data.symbol || '';
+      renderQuoteBanner(data.quote);
 
       document.querySelectorAll('.segment-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === data.mode);
@@ -1055,7 +1130,6 @@
 
       document.getElementById('tickRangeRow').style.display = isBaseEnabled ? 'none' : 'flex';
 
-      // 表格欄位開關
       document.getElementById('thCost').style.display = displayConfig.colCost ? '' : 'none';
       document.getElementById('thProfit').style.display = displayConfig.colProfit ? '' : 'none';
       document.getElementById('thRoi').style.display = displayConfig.colRoi ? '' : 'none';
@@ -1244,6 +1318,103 @@
       summaryGrid.style.display = summaryHtml.trim() === '' ? 'none' : 'grid';
     }
 
+    /* 即時行情串接邏輯 */
+    async function fetchLiveQuote() {
+      const input = document.getElementById('quoteSymbolInput');
+      const symbol = input.value.trim().toUpperCase();
+      if (!symbol) {
+        alert('請先輸入台股股票代號（例如 2330 或 3324）');
+        return;
+      }
+
+      const btn = document.getElementById('fetchQuoteBtn');
+      btn.disabled = true;
+      btn.innerHTML = '連線中...';
+
+      try {
+        const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${symbol}.tw|otc_${symbol}.tw&json=1&delay=0&_=${Date.now()}`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        
+        const res = await fetch(proxyUrl);
+        const data = await res.json();
+
+        if (!data || !data.msgArray || data.msgArray.length === 0) {
+          throw new Error('查無此股票資料');
+        }
+
+        const stock = data.msgArray[0];
+        const name = stock.n || symbol;
+        const prevClose = parseFloat(stock.y) || 0;
+        let currentPrice = parseFloat(stock.z);
+
+        if (isNaN(currentPrice) || currentPrice === 0) {
+          if (stock.a && stock.a.split('_')[0]) currentPrice = parseFloat(stock.a.split('_')[0]);
+          else if (stock.b && stock.b.split('_')[0]) currentPrice = parseFloat(stock.b.split('_')[0]);
+          else currentPrice = prevClose;
+        }
+
+        const openPrice = parseFloat(stock.o) || prevClose;
+        const diff = currentPrice - prevClose;
+        const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
+        const time = stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false });
+
+        const quoteObj = {
+          symbol,
+          name,
+          currentPrice,
+          openPrice,
+          prevClose,
+          diff,
+          diffPercent,
+          time
+        };
+
+        tabsData[currentTab].symbol = symbol;
+        tabsData[currentTab].name = `${symbol} ${name}`;
+        tabsData[currentTab].quote = quoteObj;
+
+        // 自動帶入價格與開盤價
+        if (tabsData[currentTab].orders.length > 0) {
+          tabsData[currentTab].orders[0].price = currentPrice;
+        }
+        tabsData[currentTab].basePrice = openPrice > 0 ? openPrice : currentPrice;
+
+        updateTabTitles();
+        renderQuoteBanner(quoteObj);
+        renderOrderRows();
+        renderTable();
+        saveState();
+
+      } catch (err) {
+        console.error(err);
+        alert('抓取即時行情失敗，請確認代號正確或網路連線正常。');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>📡</span> 抓即時';
+      }
+    }
+
+    function renderQuoteBanner(q) {
+      const box = document.getElementById('quoteInfoBox');
+      if (!q) {
+        box.style.display = 'none';
+        return;
+      }
+
+      box.style.display = 'flex';
+      document.getElementById('quoteStockName').innerText = `${q.name} (${q.symbol}) ${q.currentPrice.toFixed(2)}`;
+      
+      const diffEl = document.getElementById('quotePriceDiff');
+      const isUp = q.diff > 0;
+      const isDown = q.diff < 0;
+      const sign = isUp ? '+' : '';
+      const color = isUp ? 'var(--profit)' : (isDown ? 'var(--loss)' : 'var(--text-muted)');
+      
+      diffEl.style.color = color;
+      diffEl.innerText = `${sign}${q.diff.toFixed(2)} (${sign}${q.diffPercent.toFixed(2)}%)`;
+      document.getElementById('quoteTime').innerText = `更新 ${q.time}`;
+    }
+
     function openSettings() {
       document.getElementById('settingsModal').style.display = 'flex';
     }
@@ -1289,6 +1460,12 @@
     document.getElementById('tickRange').addEventListener('change', () => {
       saveState();
       renderTable();
+    });
+
+    document.getElementById('quoteSymbolInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        fetchLiveQuote();
+      }
     });
 
     loadState();
