@@ -480,28 +480,26 @@
     }
 
     function stepTick(price, direction) {
-      let p = Math.round(price * 1000) / 1000;
-      let tick = getTickSize(p);
-
+      let p = Number(price);
       if (direction > 0) {
-        let remainder = Math.round((p % tick) * 1000) / 1000;
-        if (Math.abs(remainder) > 0.0001 && Math.abs(remainder - tick) > 0.0001) {
-          p = Math.floor(p / tick) * tick + tick;
-        } else {
-          p += tick;
+        let tick = getTickSize(p);
+        let aligned = Math.floor(Math.round(p * 100) / Math.round(tick * 100)) * tick;
+        let nextP = Math.round((aligned + tick) * 100) / 100;
+        if (nextP <= p + 0.0001) {
+          tick = getTickSize(nextP);
+          nextP = Math.round((nextP + tick) * 100) / 100;
         }
-      } else if (direction < 0) {
-        let remainder = Math.round((p % tick) * 1000) / 1000;
-        if (Math.abs(remainder) > 0.0001 && Math.abs(remainder - tick) > 0.0001) {
-          p = Math.floor(p / tick) * tick;
-        } else {
-          let testLower = Math.round((p - 0.001) * 1000) / 1000;
-          tick = getTickSize(testLower);
-          p -= tick;
+        return nextP;
+      } else {
+        let testP = p - 0.0001;
+        let tick = getTickSize(testP);
+        let aligned = Math.floor(Math.round(p * 100) / Math.round(tick * 100)) * tick;
+        let nextP = aligned;
+        if (nextP >= p - 0.0001) {
+          nextP = Math.round((nextP - tick) * 100) / 100;
         }
-        p = Math.max(0.01, p);
+        return Math.max(0.01, Math.round(nextP * 100) / 100);
       }
-      return Math.round(p * 100) / 100;
     }
 
     function getLimitPrice(ref, direction) {
@@ -667,13 +665,13 @@
       let searchP = inputPrice;
       let count = 0;
       while (count < 300) {
+        searchP = stepTick(searchP, isShort ? -1 : 1);
+        count++;
         const res = calculateTrade(inputPrice, searchP, shares, discount, taxRate, isShort);
         if (res.netProfit > 0) {
           beText = `${count} Tick (${searchP.toFixed(2)})`;
           break;
         }
-        searchP = stepTick(searchP, isShort ? -1 : 1);
-        count++;
       }
 
       let dynamicBoxes = '';
