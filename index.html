@@ -193,6 +193,7 @@
       font-weight: 700;
       text-transform: uppercase;
       -webkit-appearance: none;
+      min-width: 0;
     }
     .quote-btn {
       background: var(--primary);
@@ -550,13 +551,9 @@
       color: var(--text-muted);
       font-weight: 600;
     }
-    .inv-profit-badge {
-      font-size: 0.95rem;
-      font-weight: 700;
-    }
     .inv-stats-row {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1.2fr 1.2fr;
       gap: 6px;
       background: var(--card-inner);
       border-radius: 8px;
@@ -571,6 +568,7 @@
     .inv-stat-val {
       font-weight: 700;
       margin-top: 2px;
+      font-variant-numeric: tabular-nums;
     }
 
     /* Modal */
@@ -666,7 +664,6 @@
     <div class="segment-btn" data-mode="inventory" onclick="setMode('inventory')">庫存</div>
   </div>
 
-  <!-- 計算機專用頂部分頁 -->
   <div class="tab-bar" id="calcTabBar">
     <div class="tab-item active" data-tab="0" onclick="handleTabClick(0)">
       <span id="tabName0">標的 1</span>
@@ -682,13 +679,11 @@
     </div>
   </div>
 
-  <!-- 計算機做多/做空切換列 -->
   <div class="order-segmented" id="directionBar">
     <div class="order-btn active-buy" id="btnBuy" onclick="setDirection('buy')">買進 (做多)</div>
     <div class="order-btn" id="btnSell" onclick="setDirection('sell')">賣出 (做空)</div>
   </div>
 
-  <!-- 計算機主要操作區 -->
   <div id="calcView">
     <div class="card">
       <div class="quote-bar">
@@ -767,13 +762,12 @@
     </div>
   </div>
 
-  <!-- 庫存管理主要操作區 -->
   <div id="inventoryView" style="display:none;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <button type="button" class="quote-btn" id="syncAllInvBtn" onclick="syncAllInventory()" style="flex:1; margin-right:8px; padding:8px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
+      <button type="button" class="quote-btn" id="syncAllInvBtn" onclick="syncAllInventory()" style="flex:1; padding:9px 0;">
         一鍵同步全部持股現價
       </button>
-      <button type="button" class="clear-btn" onclick="addInventoryStock()" style="padding:8px 12px; background:var(--card-bg); color:var(--primary); font-weight:700;">
+      <button type="button" class="clear-btn" onclick="addInventoryStock()" style="padding:9px 12px; background:var(--card-bg); color:var(--primary); font-weight:700;">
         + 新增持股
       </button>
     </div>
@@ -783,7 +777,6 @@
     <div id="inventoryList"></div>
   </div>
 
-  <!-- 設定 Modal -->
   <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -882,7 +875,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v20_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v21_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -915,8 +908,8 @@
         id: 'inv_' + Date.now(),
         symbol: '2330',
         name: '2330 台積電',
-        type: 'swing', // 'swing' (波段) 或 'warrant' (權證)
-        unit: 'lot',   // 'lot' (張) 或 'odd' (股)
+        type: 'swing',
+        unit: 'lot',
         currentPrice: null,
         diff: 0,
         diffPercent: 0,
@@ -1058,7 +1051,7 @@
       if (!isNaN(val) && val > 0) {
         currentDiscount = val;
         saveState();
-        if (currentMode === 'inventory') renderInventoryList();
+        if (currentMode === 'inventory') recalculateInventorySummary();
         else renderTable();
       }
     });
@@ -1470,7 +1463,7 @@
         let curDown = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
           curDown = stepTick(curDown, -1);
-          downPrices.push({ tickOffset: `-${i}`, price: curDown, isOpen: false });
+          downPrices.push({ tickOffset: `-${i}`, price: curDown });
         }
       }
 
@@ -1800,7 +1793,7 @@
       }
     }
 
-    /* ---------------- 庫存管理核心邏輯 ---------------- */
+    /* ---------------- 庫存管理核心邏輯（修復輸入失去焦點） ---------------- */
 
     function addInventoryStock() {
       const newStock = {
@@ -1845,6 +1838,7 @@
       saveState();
     }
 
+    // 關鍵修正：輸入時只更新數據與數值看板，不銷毀 DOM，保證鍵盤與小數點不中斷
     function updateInvOrder(invIndex, ordIndex, key, val) {
       const inv = inventoryData[invIndex];
       if (key === 'price') {
@@ -1852,37 +1846,76 @@
       } else {
         inv.orders[ordIndex][key] = parseFloat(val) || 0;
       }
-      renderInventoryList();
+      updateSingleCardStats(invIndex);
+      recalculateInventorySummary();
       saveState();
     }
 
     function updateInvField(invIndex, key, val) {
       inventoryData[invIndex][key] = val;
+      if (key === 'symbol') {
+        const sym = val.trim().toUpperCase();
+        inventoryData[invIndex].symbol = sym;
+        if (!sym) {
+          inventoryData[invIndex].name = '自訂持股';
+          inventoryData[invIndex].currentPrice = null;
+        }
+      }
       renderInventoryList();
       saveState();
     }
 
-    async function syncSingleInventory(invIndex) {
+    function updateSingleCardStats(invIndex) {
       const inv = inventoryData[invIndex];
-      if (!inv.symbol || inv.symbol.trim() === '') {
-        alert('請先輸入股票代號');
-        return;
-      }
-      try {
-        const q = await queryLiveStockData(inv.symbol);
-        if (q) {
-          inv.name = `${q.symbol} ${q.name}`;
-          inv.currentPrice = q.currentPrice;
-          inv.diff = q.diff;
-          inv.diffPercent = q.diffPercent;
-          renderInventoryList();
-          saveState();
-        } else {
-          alert(`查無代號 ${inv.symbol} 的行情`);
+      let invTotalBuyAmt = 0;
+      let invTotalShares = 0;
+      let invTotalBuyCost = 0;
+      let hasValidBuyPrice = false;
+
+      const taxRate = inv.type === 'warrant' ? 0.001 : 0.003;
+      const isOdd = inv.unit === 'odd';
+
+      inv.orders.forEach(ord => {
+        if (ord.price !== null && ord.price > 0 && ord.qty > 0) {
+          hasValidBuyPrice = true;
+          const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
+          const amt = ord.price * shares;
+          const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
+          invTotalBuyAmt += amt;
+          invTotalShares += shares;
+          invTotalBuyCost += (amt + fee);
         }
-      } catch (e) {
-        console.error(e);
-        alert('同步失敗，請檢查網路連線');
+      });
+
+      const avgBuyPrice = (hasValidBuyPrice && invTotalShares > 0) ? (invTotalBuyAmt / invTotalShares) : 0;
+      const curPrice = inv.currentPrice || 0;
+
+      let netProfit = 0;
+      let roi = '0.00';
+
+      if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
+        const marketVal = curPrice * invTotalShares;
+        const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
+        const sellTax = Math.floor(marketVal * taxRate);
+        const netSellAmt = marketVal - sellFee - sellTax;
+        netProfit = netSellAmt - invTotalBuyCost;
+        roi = ((netProfit / invTotalBuyCost) * 100).toFixed(2);
+      }
+
+      const isProfit = netProfit > 0;
+      const isLoss = netProfit < 0;
+      const profitSign = isProfit ? '+' : '';
+      const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
+
+      const avgEl = document.getElementById(`inv-avg-${invIndex}`);
+      const pnlEl = document.getElementById(`inv-pnl-${invIndex}`);
+
+      if (avgEl) {
+        avgEl.innerText = avgBuyPrice > 0 ? `${avgBuyPrice.toFixed(2)} (${invTotalShares}股)` : '--';
+      }
+      if (pnlEl) {
+        pnlEl.style.color = profitColor;
+        pnlEl.innerText = (curPrice > 0 && hasValidBuyPrice) ? `${profitSign}${netProfit.toLocaleString()} (${profitSign}${roi}%)` : '--';
       }
     }
 
@@ -1914,13 +1947,73 @@
       btn.innerText = '一鍵同步全部持股現價';
     }
 
-    function renderInventoryList() {
-      const container = document.getElementById('inventoryList');
-      container.innerHTML = '';
-
+    function recalculateInventorySummary() {
       let totalInvestCost = 0;
       let totalMarketValue = 0;
       let totalNetProfit = 0;
+
+      inventoryData.forEach((inv) => {
+        let invTotalShares = 0;
+        let invTotalBuyCost = 0;
+        let hasValidBuyPrice = false;
+        const taxRate = inv.type === 'warrant' ? 0.001 : 0.003;
+        const isOdd = inv.unit === 'odd';
+
+        inv.orders.forEach(ord => {
+          if (ord.price !== null && ord.price > 0 && ord.qty > 0) {
+            hasValidBuyPrice = true;
+            const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
+            const amt = ord.price * shares;
+            const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
+            invTotalShares += shares;
+            invTotalBuyCost += (amt + fee);
+          }
+        });
+
+        const curPrice = inv.currentPrice || 0;
+        if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
+          const marketVal = curPrice * invTotalShares;
+          const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
+          const sellTax = Math.floor(marketVal * taxRate);
+          const netSellAmt = marketVal - sellFee - sellTax;
+          const netProfit = netSellAmt - invTotalBuyCost;
+
+          totalInvestCost += invTotalBuyCost;
+          totalMarketValue += marketVal;
+          totalNetProfit += netProfit;
+        }
+      });
+
+      const totalRoi = totalInvestCost > 0 ? ((totalNetProfit / totalInvestCost) * 100).toFixed(2) : '0.00';
+      const isTotalProfit = totalNetProfit > 0;
+      const isTotalLoss = totalNetProfit < 0;
+      const totalSign = isTotalProfit ? '+' : '';
+      const totalProfitColor = isTotalProfit ? 'var(--profit)' : (isTotalLoss ? 'var(--loss)' : 'var(--text)');
+
+      const summaryEl = document.getElementById('invTotalSummary');
+      summaryEl.innerHTML = `
+        <div class="summary-box">
+          <div class="summary-title">總投入資金 (含規費)</div>
+          <div class="summary-value">${totalInvestCost > 0 ? totalInvestCost.toLocaleString() + ' 元' : '--'}</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-title">當前庫存總市值</div>
+          <div class="summary-value">${totalMarketValue > 0 ? Math.round(totalMarketValue).toLocaleString() + ' 元' : '--'}</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-title">總未實現損益</div>
+          <div class="summary-value" style="color:${totalProfitColor};">${totalInvestCost > 0 ? `${totalSign}${totalNetProfit.toLocaleString()} 元` : '--'}</div>
+        </div>
+        <div class="summary-box">
+          <div class="summary-title">總整體報酬率</div>
+          <div class="summary-value" style="color:${totalProfitColor};">${totalInvestCost > 0 ? `${totalSign}${totalRoi}%` : '--'}</div>
+        </div>
+      `;
+    }
+
+    function renderInventoryList() {
+      const container = document.getElementById('inventoryList');
+      container.innerHTML = '';
 
       inventoryData.forEach((inv, invIdx) => {
         let invTotalBuyAmt = 0;
@@ -1947,29 +2040,24 @@
         const avgBuyPrice = (hasValidBuyPrice && invTotalShares > 0) ? (invTotalBuyAmt / invTotalShares) : 0;
         const curPrice = inv.currentPrice || 0;
 
-        let marketVal = 0;
-        let sellFee = 0;
-        let sellTax = 0;
         let netProfit = 0;
         let roi = '0.00';
 
         if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
-          marketVal = curPrice * invTotalShares;
-          sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
-          sellTax = Math.floor(marketVal * taxRate);
+          const marketVal = curPrice * invTotalShares;
+          const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
+          const sellTax = Math.floor(marketVal * taxRate);
           const netSellAmt = marketVal - sellFee - sellTax;
           netProfit = netSellAmt - invTotalBuyCost;
           roi = ((netProfit / invTotalBuyCost) * 100).toFixed(2);
-
-          totalInvestCost += invTotalBuyCost;
-          totalMarketValue += marketVal;
-          totalNetProfit += netProfit;
         }
 
         const isProfit = netProfit > 0;
         const isLoss = netProfit < 0;
         const profitSign = isProfit ? '+' : '';
         const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
+
+        const curPriceColor = inv.diff > 0 ? 'var(--profit)' : (inv.diff < 0 ? 'var(--loss)' : 'var(--text)');
 
         const card = document.createElement('div');
         card.className = 'inventory-item-card';
@@ -1982,7 +2070,7 @@
           ordersHtml += `
             <div class="order-row" style="margin-bottom:6px;">
               <span class="order-tag">#${ordIdx + 1}</span>
-              <input type="number" class="order-input" placeholder="買入價格" value="${pVal}" step="any" min="0.01" inputmode="decimal" style="background:#1c1c1e; border:1px solid var(--border); border-radius:6px; padding:6px;" oninput="updateInvOrder(${invIdx}, ${ordIdx}, 'price', this.value)">
+              <input type="number" class="order-input" placeholder="價格" value="${pVal}" step="any" min="0.01" inputmode="decimal" style="background:#1c1c1e; border:1px solid var(--border); border-radius:6px; padding:6px;" oninput="updateInvOrder(${invIdx}, ${ordIdx}, 'price', this.value)">
               <input type="number" class="order-input" placeholder="${qtyLabel}" value="${qVal}" step="${isOdd ? '1' : 'any'}" min="${isOdd ? 1 : 0.001}" inputmode="${isOdd ? 'numeric' : 'decimal'}" style="background:#1c1c1e; border:1px solid var(--border); border-radius:6px; padding:6px;" oninput="updateInvOrder(${invIdx}, ${ordIdx}, 'qty', this.value)">
               ${inv.orders.length > 1 ? `<button class="order-del-btn" type="button" onclick="deleteInvOrderRow(${invIdx}, ${ordIdx})">×</button>` : ''}
             </div>
@@ -1993,37 +2081,36 @@
           <div class="inventory-header">
             <div style="display:flex; align-items:center; gap:6px;">
               <span class="inv-type-pill">${inv.type === 'warrant' ? '權證' : '波段'}</span>
-              <span style="font-weight:700; font-size:1rem;">${inv.name || '自訂持股'}</span>
+              <span style="font-weight:700; font-size:0.95rem;">${inv.name || '自訂持股'}</span>
             </div>
             <button type="button" class="order-del-btn" style="background:transparent; color:var(--text-muted); font-size:1.1rem;" onclick="deleteInventoryStock(${invIdx})" title="刪除持股">✕</button>
           </div>
 
           <div style="display:flex; gap:6px; margin-bottom:8px;">
-            <input type="text" class="quote-input" placeholder="代號 (如 2330)" value="${inv.symbol || ''}" style="flex:1;" onchange="updateInvField(${invIdx}, 'symbol', this.value.toUpperCase())">
-            <select class="input-control" style="width:78px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'type', this.value)">
+            <input type="text" class="quote-input" placeholder="代號 Ex. 2330" value="${inv.symbol || ''}" style="flex:1;" onchange="updateInvField(${invIdx}, 'symbol', this.value.toUpperCase())">
+            <select class="input-control" style="width:72px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'type', this.value)">
               <option value="swing" ${inv.type === 'swing' ? 'selected' : ''}>波段</option>
               <option value="warrant" ${inv.type === 'warrant' ? 'selected' : ''}>權證</option>
             </select>
-            <select class="input-control" style="width:78px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'unit', this.value)">
+            <select class="input-control" style="width:72px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'unit', this.value)">
               <option value="lot" ${inv.unit === 'lot' ? 'selected' : ''}>整張</option>
               <option value="odd" ${inv.unit === 'odd' ? 'selected' : ''}>零股</option>
             </select>
-            <button type="button" class="quote-btn" style="padding:6px 10px;" onclick="syncSingleInventory(${invIdx})">同步</button>
           </div>
 
           <div class="inv-stats-row">
             <div>
               <div class="inv-stat-label">當前現價</div>
-              <div class="inv-stat-val" style="color:${profitColor};">${curPrice > 0 ? curPrice.toFixed(2) : '--'} 元</div>
+              <div class="inv-stat-val" style="color:${curPriceColor};">${curPrice > 0 ? curPrice.toFixed(2) : '--'}</div>
             </div>
             <div>
-              <div class="inv-stat-label">買進均價 / 總股數</div>
-              <div class="inv-stat-val">${avgBuyPrice > 0 ? avgBuyPrice.toFixed(2) : '--'} (${invTotalShares}股)</div>
+              <div class="inv-stat-label">買進均價 / 股數</div>
+              <div class="inv-stat-val" id="inv-avg-${invIdx}">${avgBuyPrice > 0 ? avgBuyPrice.toFixed(2) : '--'} (${invTotalShares}股)</div>
             </div>
             <div>
-              <div class="inv-stat-label">未實現損益 (報酬率)</div>
-              <div class="inv-stat-val" style="color:${profitColor}; font-weight:700;">
-                ${curPrice > 0 ? `${profitSign}${netProfit.toLocaleString()} (${profitSign}${roi}%)` : '--'}
+              <div class="inv-stat-label">損益 (報酬率)</div>
+              <div class="inv-stat-val" id="inv-pnl-${invIdx}" style="color:${profitColor};">
+                ${(curPrice > 0 && hasValidBuyPrice) ? `${profitSign}${netProfit.toLocaleString()} (${profitSign}${roi}%)` : '--'}
               </div>
             </div>
           </div>
@@ -2037,32 +2124,7 @@
         container.appendChild(card);
       });
 
-      // 頂部庫存總覽計算
-      const totalRoi = totalInvestCost > 0 ? ((totalNetProfit / totalInvestCost) * 100).toFixed(2) : '0.00';
-      const isTotalProfit = totalNetProfit > 0;
-      const isTotalLoss = totalNetProfit < 0;
-      const totalSign = isTotalProfit ? '+' : '';
-      const totalProfitColor = isTotalProfit ? 'var(--profit)' : (isTotalLoss ? 'var(--loss)' : 'var(--text)');
-
-      const summaryEl = document.getElementById('invTotalSummary');
-      summaryEl.innerHTML = `
-        <div class="summary-box">
-          <div class="summary-title">總投入資金 (含規費)</div>
-          <div class="summary-value">${totalInvestCost > 0 ? totalInvestCost.toLocaleString() + ' 元' : '--'}</div>
-        </div>
-        <div class="summary-box">
-          <div class="summary-title">當前庫存總市值</div>
-          <div class="summary-value">${totalMarketValue > 0 ? Math.round(totalMarketValue).toLocaleString() + ' 元' : '--'}</div>
-        </div>
-        <div class="summary-box">
-          <div class="summary-title">總未實現損益</div>
-          <div class="summary-value" style="color:${totalProfitColor};">${totalInvestCost > 0 ? `${totalSign}${totalNetProfit.toLocaleString()} 元` : '--'}</div>
-        </div>
-        <div class="summary-box">
-          <div class="summary-title">總整體報酬率</div>
-          <div class="summary-value" style="color:${totalProfitColor};">${totalInvestCost > 0 ? `${totalSign}${totalRoi}%` : '--'}</div>
-        </div>
-      `;
+      recalculateInventorySummary();
     }
 
     function restartAutoRefresh() {
