@@ -784,6 +784,15 @@
         <button class="close-btn" onclick="closeSettings()">✕</button>
       </div>
 
+      <div class="modal-section-title">庫存未實現損益計算方式</div>
+      <div class="input-row">
+        <span class="input-label">庫存手續費計算</span>
+        <select id="invFeeModeSelect" class="input-control" onchange="handleInvFeeModeChange(this.value)">
+          <option value="standard" selected>無折讓 (符合券商App)</option>
+          <option value="discount">套用自訂折讓比率</option>
+        </select>
+      </div>
+
       <div class="modal-section-title">即時行情自動更新</div>
       <div class="input-row">
         <span class="input-label">開盤即時自動更新</span>
@@ -875,12 +884,13 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v23_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v24_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
     let minFeeLimit = 20;
     let currentDiscount = 0.25;
+    let invFeeMode = 'standard'; // 'standard' (無折讓, 吻合券商App) 或 'discount'
     let autoRefresh = true;
     let showFiveOrder = true;
     let refreshInterval = 5000;
@@ -903,21 +913,7 @@
       { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null }
     ];
 
-    const defaultInventory = [
-      {
-        id: 'inv_' + Date.now(),
-        symbol: '',
-        name: '自訂持股',
-        type: 'swing',
-        unit: 'lot',
-        currentPrice: null,
-        diff: 0,
-        diffPercent: 0,
-        orders: [
-          { price: null, qty: 1 }
-        ]
-      }
-    ];
+    const defaultInventory = [];
 
     let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
     let inventoryData = JSON.parse(JSON.stringify(defaultInventory));
@@ -950,6 +946,10 @@
           if (parsed.discount !== undefined) {
             currentDiscount = parseFloat(parsed.discount);
             applyDiscountToUI(currentDiscount);
+          }
+          if (parsed.invFeeMode !== undefined) {
+            invFeeMode = parsed.invFeeMode;
+            document.getElementById('invFeeModeSelect').value = invFeeMode;
           }
           if (parsed.autoRefresh !== undefined) {
             autoRefresh = parsed.autoRefresh;
@@ -994,6 +994,12 @@
       displayConfig.colRoi = document.getElementById('showColRoi').checked;
       saveState();
       if (currentMode !== 'inventory') renderTable();
+    }
+
+    function handleInvFeeModeChange(val) {
+      invFeeMode = val;
+      saveState();
+      if (currentMode === 'inventory') renderInventoryList();
     }
 
     function handleAutoRefreshToggle() {
@@ -1064,6 +1070,7 @@
           currentTab: currentTab,
           currentMode: currentMode,
           discount: currentDiscount,
+          invFeeMode: invFeeMode,
           tickRange: document.getElementById('tickRange').value,
           minFee: minFeeLimit,
           autoRefresh: autoRefresh,
@@ -1463,7 +1470,7 @@
         let curDown = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
           curDown = stepTick(curDown, -1);
-          downPrices.push({ tickOffset: `-${i}`, price: curDown, isOpen: false });
+          downPrices.push({ tickOffset: `-${i}`, price: curDown });
         }
       }
 
@@ -1690,7 +1697,6 @@
         tabsData[currentTab].name = `${symbol} ${quoteObj.name}`;
         tabsData[currentTab].quote = quoteObj;
 
-        // 計算機模式下：手動同步時若 #1 尚無價格，自動帶入當下現價
         if (isManual && tabsData[currentTab].orders.length > 0 && quoteObj.currentPrice > 0) {
           if (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined) {
             tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
@@ -1865,8 +1871,7 @@
       saveState();
     }
 
-    function updateSingleCardStats(invIndex) {
-      const inv = inventoryData[invIndex];
+    function calculateInventoryPnl(inv) {
       let invTotalBuyAmt = 0;
       let invTotalShares = 0;
       let invTotalBuyCost = 0;
@@ -1874,13 +1879,15 @@
 
       const taxRate = inv.type === 'warrant' ? 0.001 : 0.003;
       const isOdd = inv.unit === 'odd';
+      const useSellDiscount = (invFeeMode === 'discount') ? currentDiscount : 1.0;
 
       inv.orders.forEach(ord => {
         if (ord.price !== null && ord.price > 0 && ord.qty > 0) {
           hasValidBuyPrice = true;
           const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
           const amt = ord.price * shares;
-          const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
+          // 買進手續費以券商實收（無折讓）記錄持有成本，符合券商帳務
+          const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425));
           invTotalBuyAmt += amt;
           invTotalShares += shares;
           invTotalBuyCost += (amt + fee);
@@ -1890,20 +1897,37 @@
       const avgBuyPrice = (hasValidBuyPrice && invTotalShares > 0) ? (invTotalBuyAmt / invTotalShares) : 0;
       const curPrice = inv.currentPrice || 0;
 
+      let marketVal = 0;
       let netProfit = 0;
       let roi = '0.00';
 
       if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
-        const marketVal = curPrice * invTotalShares;
-        const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
+        marketVal = curPrice * invTotalShares;
+        const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * useSellDiscount));
         const sellTax = Math.floor(marketVal * taxRate);
         const netSellAmt = marketVal - sellFee - sellTax;
         netProfit = netSellAmt - invTotalBuyCost;
         roi = ((netProfit / invTotalBuyCost) * 100).toFixed(2);
       }
 
-      const isProfit = netProfit > 0;
-      const isLoss = netProfit < 0;
+      return {
+        hasValidBuyPrice,
+        invTotalShares,
+        invTotalBuyCost,
+        avgBuyPrice,
+        curPrice,
+        marketVal,
+        netProfit,
+        roi
+      };
+    }
+
+    function updateSingleCardStats(invIndex) {
+      const inv = inventoryData[invIndex];
+      const res = calculateInventoryPnl(inv);
+
+      const isProfit = res.netProfit > 0;
+      const isLoss = res.netProfit < 0;
       const profitSign = isProfit ? '+' : '';
       const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
 
@@ -1911,11 +1935,11 @@
       const pnlEl = document.getElementById(`inv-pnl-${invIndex}`);
 
       if (avgEl) {
-        avgEl.innerText = avgBuyPrice > 0 ? `${avgBuyPrice.toFixed(2)} (${invTotalShares}股)` : '--';
+        avgEl.innerText = res.avgBuyPrice > 0 ? `${res.avgBuyPrice.toFixed(2)} (${res.invTotalShares}股)` : '--';
       }
       if (pnlEl) {
         pnlEl.style.color = profitColor;
-        pnlEl.innerText = (curPrice > 0 && hasValidBuyPrice) ? `${profitSign}${netProfit.toLocaleString()} (${profitSign}${roi}%)` : '--';
+        pnlEl.innerText = (res.curPrice > 0 && res.hasValidBuyPrice) ? `${profitSign}${res.netProfit.toLocaleString()} (${profitSign}${res.roi}%)` : '--';
       }
     }
 
@@ -1953,34 +1977,11 @@
       let totalNetProfit = 0;
 
       inventoryData.forEach((inv) => {
-        let invTotalShares = 0;
-        let invTotalBuyCost = 0;
-        let hasValidBuyPrice = false;
-        const taxRate = inv.type === 'warrant' ? 0.001 : 0.003;
-        const isOdd = inv.unit === 'odd';
-
-        inv.orders.forEach(ord => {
-          if (ord.price !== null && ord.price > 0 && ord.qty > 0) {
-            hasValidBuyPrice = true;
-            const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
-            const amt = ord.price * shares;
-            const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
-            invTotalShares += shares;
-            invTotalBuyCost += (amt + fee);
-          }
-        });
-
-        const curPrice = inv.currentPrice || 0;
-        if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
-          const marketVal = curPrice * invTotalShares;
-          const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
-          const sellTax = Math.floor(marketVal * taxRate);
-          const netSellAmt = marketVal - sellFee - sellTax;
-          const netProfit = netSellAmt - invTotalBuyCost;
-
-          totalInvestCost += invTotalBuyCost;
-          totalMarketValue += marketVal;
-          totalNetProfit += netProfit;
+        const res = calculateInventoryPnl(inv);
+        if (res.hasValidBuyPrice && res.curPrice > 0 && res.invTotalShares > 0) {
+          totalInvestCost += res.invTotalBuyCost;
+          totalMarketValue += res.marketVal;
+          totalNetProfit += res.netProfit;
         }
       });
 
@@ -2016,47 +2017,14 @@
       container.innerHTML = '';
 
       inventoryData.forEach((inv, invIdx) => {
-        let invTotalBuyAmt = 0;
-        let invTotalShares = 0;
-        let invTotalBuyCost = 0;
-        let hasValidBuyPrice = false;
-
-        const taxRate = inv.type === 'warrant' ? 0.001 : 0.003;
+        const res = calculateInventoryPnl(inv);
         const isOdd = inv.unit === 'odd';
         const qtyLabel = isOdd ? '股數' : '張數';
 
-        inv.orders.forEach(ord => {
-          if (ord.price !== null && ord.price > 0 && ord.qty > 0) {
-            hasValidBuyPrice = true;
-            const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
-            const amt = ord.price * shares;
-            const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
-            invTotalBuyAmt += amt;
-            invTotalShares += shares;
-            invTotalBuyCost += (amt + fee);
-          }
-        });
-
-        const avgBuyPrice = (hasValidBuyPrice && invTotalShares > 0) ? (invTotalBuyAmt / invTotalShares) : 0;
-        const curPrice = inv.currentPrice || 0;
-
-        let netProfit = 0;
-        let roi = '0.00';
-
-        if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
-          const marketVal = curPrice * invTotalShares;
-          const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425 * currentDiscount));
-          const sellTax = Math.floor(marketVal * taxRate);
-          const netSellAmt = marketVal - sellFee - sellTax;
-          netProfit = netSellAmt - invTotalBuyCost;
-          roi = ((netProfit / invTotalBuyCost) * 100).toFixed(2);
-        }
-
-        const isProfit = netProfit > 0;
-        const isLoss = netProfit < 0;
+        const isProfit = res.netProfit > 0;
+        const isLoss = res.netProfit < 0;
         const profitSign = isProfit ? '+' : '';
         const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
-
         const curPriceColor = inv.diff > 0 ? 'var(--profit)' : (inv.diff < 0 ? 'var(--loss)' : 'var(--text)');
 
         const card = document.createElement('div');
@@ -2101,16 +2069,16 @@
           <div class="inv-stats-row">
             <div>
               <div class="inv-stat-label">當前現價</div>
-              <div class="inv-stat-val" style="color:${curPriceColor};">${curPrice > 0 ? curPrice.toFixed(2) : '--'}</div>
+              <div class="inv-stat-val" style="color:${curPriceColor};">${res.curPrice > 0 ? res.curPrice.toFixed(2) : '--'}</div>
             </div>
             <div>
               <div class="inv-stat-label">買進均價 / 股數</div>
-              <div class="inv-stat-val" id="inv-avg-${invIdx}">${avgBuyPrice > 0 ? avgBuyPrice.toFixed(2) : '--'} (${invTotalShares}股)</div>
+              <div class="inv-stat-val" id="inv-avg-${invIdx}">${res.avgBuyPrice > 0 ? res.avgBuyPrice.toFixed(2) : '--'} (${res.invTotalShares}股)</div>
             </div>
             <div>
               <div class="inv-stat-label">損益 (報酬率)</div>
               <div class="inv-stat-val" id="inv-pnl-${invIdx}" style="color:${profitColor};">
-                ${(curPrice > 0 && hasValidBuyPrice) ? `${profitSign}${netProfit.toLocaleString()} (${profitSign}${roi}%)` : '--'}
+                ${(res.curPrice > 0 && res.hasValidBuyPrice) ? `${profitSign}${res.netProfit.toLocaleString()} (${profitSign}${res.roi}%)` : '--'}
               </div>
             </div>
           </div>
