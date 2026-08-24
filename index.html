@@ -209,8 +209,8 @@
       justify-content: center;
       white-space: nowrap;
     }
-    .quote-btn:disabled {
-      opacity: 0.5;
+    .quote-btn:active {
+      opacity: 0.7;
     }
     .clear-btn {
       background: var(--card-inner);
@@ -246,59 +246,6 @@
       color: var(--text);
       font-size: 0.9rem;
     }
-    .pulse-dot {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--loss);
-      margin-right: 4px;
-      animation: pulse 1.5s infinite;
-    }
-    @keyframes pulse {
-      0% { transform: scale(0.95); opacity: 0.5; }
-      50% { transform: scale(1.3); opacity: 1; }
-      100% { transform: scale(0.95); opacity: 0.5; }
-    }
-
-    .five-order-card {
-      background: #141416;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 6px 8px;
-      margin-bottom: 10px;
-      font-size: 0.75rem;
-    }
-    .five-order-header {
-      display: flex;
-      justify-content: space-between;
-      color: var(--text-muted);
-      font-size: 0.68rem;
-      font-weight: 700;
-      padding-bottom: 4px;
-      margin-bottom: 4px;
-      border-bottom: 0.5px solid #2c2c2e;
-    }
-    .five-order-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .five-order-table td {
-      padding: 2px 4px;
-      border: none;
-      font-variant-numeric: tabular-nums;
-    }
-    .order-clickable {
-      cursor: pointer;
-      font-weight: 700;
-    }
-    .order-clickable:active {
-      opacity: 0.6;
-    }
-    .five-bid-price { color: var(--profit); text-align: right; }
-    .five-bid-vol { color: var(--text-muted); text-align: left; }
-    .five-ask-price { color: var(--loss); text-align: left; }
-    .five-ask-vol { color: var(--text-muted); text-align: right; }
 
     .input-row {
       display: flex;
@@ -471,9 +418,6 @@
     .highlight-val {
       color: var(--profit);
     }
-    .highlight-down {
-      color: var(--loss);
-    }
     .table-card {
       background: var(--card-bg);
       border-radius: 12px;
@@ -510,18 +454,6 @@
     }
     tr.buy-row {
       background: rgba(10, 132, 255, 0.18);
-      font-weight: 700;
-    }
-    tr.open-row {
-      background: rgba(255, 255, 255, 0.15);
-      font-weight: 700;
-    }
-    tr.limit-row {
-      background: rgba(255, 69, 58, 0.22);
-      font-weight: 700;
-    }
-    tr.limit-down-row {
-      background: rgba(48, 209, 88, 0.22);
       font-weight: 700;
     }
     .text-center { text-align: center; }
@@ -675,32 +607,18 @@
   <div id="calcView">
     <div class="card">
       <div class="quote-bar">
-        <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 Ex. 2330" maxlength="8" inputmode="text">
-        <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="fetchLiveQuote(true)">同步</button>
+        <input type="text" id="quoteSymbolInput" class="quote-input" placeholder="輸入代號 Ex. 2367 旺宏" maxlength="12" inputmode="text">
+        <button type="button" class="quote-btn" id="fetchQuoteBtn" onclick="applyQuickPrice()">設定現價</button>
         <button type="button" class="clear-btn" id="clearQuoteBtn" onclick="clearQuoteInput()">清除</button>
       </div>
 
       <div class="quote-info-box" id="quoteInfoBox" style="display:none;">
         <div>
           <span class="quote-stock-name" id="quoteStockName">--</span>
-          <span id="quotePriceDiff" style="margin-left:6px; font-weight:700;">--</span>
         </div>
-        <div style="display:flex; align-items:center;">
-          <div style="color:var(--text-muted); font-size:0.72rem; display:flex; align-items:center;" id="quoteTime">
-            <span class="pulse-dot" id="liveDot" style="display:none;"></span>
-            <span id="quoteTimeText">--:--</span>
-          </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.72rem;">即時現價輸入模式</span>
         </div>
-      </div>
-
-      <div class="five-order-card" id="fiveOrderCard" style="display:none;">
-        <div class="five-order-header">
-          <span>買進五檔 (委買)</span>
-          <span>委賣五檔 (賣出)</span>
-        </div>
-        <table class="five-order-table">
-          <tbody id="fiveOrderBody"></tbody>
-        </table>
       </div>
 
       <div style="padding-top: 4px;">
@@ -753,10 +671,7 @@
   <!-- 庫存區塊 -->
   <div id="inventoryView" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
-      <button type="button" class="quote-btn" id="syncAllInvBtn" onclick="syncAllInventory()" style="flex:1; padding:9px 0;">
-        一鍵同步全部持股現價
-      </button>
-      <button type="button" class="clear-btn" onclick="addInventoryStock()" style="padding:9px 12px; background:var(--card-bg); color:var(--primary); font-weight:700;">
+      <button type="button" class="clear-btn" onclick="addInventoryStock()" style="flex:1; padding:9px 12px; background:var(--card-bg); color:var(--primary); font-weight:700;">
         + 新增持股
       </button>
     </div>
@@ -786,26 +701,6 @@
       <div class="input-row">
         <span class="input-label" id="tabSettingLabel2">啟用 標的 3</span>
         <input type="checkbox" id="showTab2" class="custom-checkbox" checked onchange="handleTabVisibilityChange(2)">
-      </div>
-
-      <div class="modal-section-title">即時行情自動更新</div>
-      <div class="input-row">
-        <span class="input-label">開盤即時自動更新</span>
-        <input type="checkbox" id="autoRefreshToggle" class="custom-checkbox" checked onchange="handleAutoRefreshToggle()">
-      </div>
-      <div class="input-row">
-        <span class="input-label">顯示即時最佳五檔</span>
-        <input type="checkbox" id="showFiveOrderToggle" class="custom-checkbox" checked onchange="handleFiveOrderToggle()">
-      </div>
-      <div class="input-row">
-        <span class="input-label">更新頻率</span>
-        <select id="refreshIntervalSelect" class="input-control" onchange="handleIntervalChange(this.value)">
-          <option value="1000">每 1 秒 (極速)</option>
-          <option value="3000">每 3 秒</option>
-          <option value="5000" selected>每 5 秒 (穩定推薦)</option>
-          <option value="10000">每 10 秒</option>
-          <option value="30000">每 30 秒</option>
-        </select>
       </div>
 
       <div class="modal-section-title">手續費與交易規則</div>
@@ -848,11 +743,11 @@
         <input type="checkbox" id="showSummaryTotal" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
       <div class="input-row">
-        <span class="input-label">跳動單位 / 開盤漲停</span>
+        <span class="input-label">跳動單位 / 漲停價</span>
         <input type="checkbox" id="showSummaryTick" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
       <div class="input-row">
-        <span class="input-label">模式與稅率 / 開盤跌停</span>
+        <span class="input-label">模式與稅率 / 跌停價</span>
         <input type="checkbox" id="showSummaryRate" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
 
@@ -879,18 +774,12 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v35_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v36_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
     let minFeeLimit = 20;
     let currentDiscount = 0.25;
-    let autoRefresh = true;
-    let showFiveOrder = true;
-    let refreshInterval = 5000;
-    let refreshTimer = null;
-    let isFetching = false;
-    let lastFetchTime = 0;
 
     let enabledTabs = [true, true, true];
 
@@ -905,9 +794,9 @@
     };
 
     const defaultTabsData = [
-      { name: '標的 1', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null },
-      { name: '標的 2', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null },
-      { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null }
+      { name: '標的 1', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], currentPrice: null },
+      { name: '標的 2', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], currentPrice: null },
+      { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], currentPrice: null }
     ];
 
     const defaultInventory = [];
@@ -934,11 +823,7 @@
           if (parsed.tabsData) tabsData = parsed.tabsData;
           if (parsed.inventoryData) inventoryData = parsed.inventoryData;
           if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
-          if (parsed.currentMode !== undefined && parsed.currentMode !== 'market' && parsed.currentMode !== 'futures') {
-            currentMode = parsed.currentMode;
-          } else {
-            currentMode = 'daytrade';
-          }
+          if (parsed.currentMode !== undefined) currentMode = parsed.currentMode;
           if (parsed.enabledTabs) enabledTabs = parsed.enabledTabs;
           if (parsed.tickRange) document.getElementById('tickRange').value = parsed.tickRange;
           if (parsed.minFee !== undefined) {
@@ -948,18 +833,6 @@
           if (parsed.discount !== undefined) {
             currentDiscount = parseFloat(parsed.discount);
             applyDiscountToUI(currentDiscount);
-          }
-          if (parsed.autoRefresh !== undefined) {
-            autoRefresh = parsed.autoRefresh;
-            document.getElementById('autoRefreshToggle').checked = autoRefresh;
-          }
-          if (parsed.showFiveOrder !== undefined) {
-            showFiveOrder = parsed.showFiveOrder;
-            document.getElementById('showFiveOrderToggle').checked = showFiveOrder;
-          }
-          if (parsed.refreshInterval !== undefined) {
-            refreshInterval = parseInt(parsed.refreshInterval, 10);
-            document.getElementById('refreshIntervalSelect').value = refreshInterval;
           }
           if (parsed.displayConfig) {
             displayConfig = Object.assign(displayConfig, parsed.displayConfig);
@@ -979,7 +852,6 @@
       document.getElementById('showColCost').checked = displayConfig.colCost;
       document.getElementById('showColProfit').checked = displayConfig.colProfit;
       document.getElementById('showColRoi').checked = displayConfig.colRoi;
-      document.getElementById('showFiveOrderToggle').checked = showFiveOrder;
 
       document.getElementById('showTab0').checked = enabledTabs[0];
       document.getElementById('showTab1').checked = enabledTabs[1];
@@ -1045,24 +917,6 @@
       if (currentMode !== 'inventory') renderTable();
     }
 
-    function handleAutoRefreshToggle() {
-      autoRefresh = document.getElementById('autoRefreshToggle').checked;
-      saveState();
-      restartAutoRefresh();
-    }
-
-    function handleFiveOrderToggle() {
-      showFiveOrder = document.getElementById('showFiveOrderToggle').checked;
-      saveState();
-      if (currentMode !== 'inventory') renderQuoteBanner(tabsData[currentTab].quote);
-    }
-
-    function handleIntervalChange(val) {
-      refreshInterval = parseInt(val, 10);
-      saveState();
-      restartAutoRefresh();
-    }
-
     function applyDiscountToUI(val) {
       const select = document.getElementById('discountSelect');
       const customRow = document.getElementById('customDiscountRow');
@@ -1116,9 +970,6 @@
           discount: currentDiscount,
           tickRange: document.getElementById('tickRange').value,
           minFee: minFeeLimit,
-          autoRefresh: autoRefresh,
-          showFiveOrder: showFiveOrder,
-          refreshInterval: refreshInterval,
           displayConfig: displayConfig
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -1132,7 +983,6 @@
       renderTabs();
       syncUIFromCurrentTab();
       saveState();
-      restartAutoRefresh();
     }
 
     function renameTab(e, index) {
@@ -1152,7 +1002,7 @@
       renderTabs();
 
       document.getElementById('quoteSymbolInput').value = data.symbol || '';
-      renderQuoteBanner(data.quote);
+      renderQuoteBanner(data.currentPrice);
 
       document.querySelectorAll('.segment-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === currentMode);
@@ -1280,7 +1130,7 @@
       const data = tabsData[currentTab];
       let cur = data.orders[idx].price;
       if (cur === null || cur === undefined || isNaN(cur) || cur <= 0) {
-        cur = (data.quote && data.quote.currentPrice > 0) ? data.quote.currentPrice : ((data.quote && data.quote.openPrice > 0) ? data.quote.openPrice : 100);
+        cur = (data.currentPrice > 0) ? data.currentPrice : 100;
       }
       const next = stepTick(cur, direction);
       data.orders[idx].price = next;
@@ -1339,7 +1189,7 @@
 
     function addOrderRow() {
       const data = tabsData[currentTab];
-      const livePrice = (data.quote && data.quote.currentPrice > 0) ? data.quote.currentPrice : null;
+      const livePrice = (data.currentPrice > 0) ? data.currentPrice : null;
       const last = data.orders[data.orders.length - 1] || { price: null, qty: data.unit === 'odd' ? 1000 : 1 };
       
       const newPrice = livePrice !== null ? livePrice : last.price;
@@ -1419,11 +1269,8 @@
       const discount = currentDiscount;
       const taxRate = getTaxRate(data.mode);
 
-      const hasLiveQuote = !!(data.quote && (data.quote.openPrice > 0 || data.quote.prevClose > 0));
-      const baseStockPrice = hasLiveQuote ? (data.quote.openPrice || data.quote.prevClose) : null;
-      const actualOpenPrice = (hasLiveQuote && data.quote.openPrice > 0) ? data.quote.openPrice : null;
-
-      document.getElementById('tickRangeRow').style.display = hasLiveQuote ? 'none' : 'flex';
+      const hasPrice = data.currentPrice > 0;
+      const baseStockPrice = hasPrice ? data.currentPrice : null;
 
       document.getElementById('thCost').style.display = displayConfig.colCost ? '' : 'none';
       document.getElementById('thProfit').style.display = displayConfig.colProfit ? '' : 'none';
@@ -1446,7 +1293,7 @@
       let calcPrice = null;
       if (hasValidOrderPrice && totalVal > 0) {
         calcPrice = totalVal / (data.orders.filter(o => o.price > 0).reduce((sum, o) => sum + o.qty, 0) || 1);
-      } else if (hasLiveQuote) {
+      } else if (hasPrice) {
         calcPrice = baseStockPrice;
       }
 
@@ -1463,7 +1310,7 @@
       const tbody = document.getElementById('tickTableBody');
 
       if (!calcPrice || calcPrice <= 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding: 24px 0;">請輸入股票代號同步行情，或填入下單價格以計算檔位</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding: 24px 0;">請於上方輸入代號與當前現價，或填入下單價格以計算檔位</td></tr>`;
         document.getElementById('summaryGrid').style.display = 'none';
         return;
       }
@@ -1473,7 +1320,7 @@
       let upLimit = 0;
       let downLimit = 0;
 
-      if (hasLiveQuote && baseStockPrice > 0) {
+      if (hasPrice && baseStockPrice > 0) {
         upLimit = getLimitPrice(baseStockPrice, 1);
         downLimit = getLimitPrice(baseStockPrice, -1);
 
@@ -1482,8 +1329,7 @@
         while (curUp < upLimit && upCount < 400) {
           curUp = stepTick(curUp, 1);
           upCount++;
-          const isOpen = actualOpenPrice !== null && Math.abs(curUp - actualOpenPrice) < 0.0001;
-          upPrices.push({ tickOffset: `+${upCount}`, price: curUp, isLimitUp: curUp >= upLimit, isOpen: isOpen });
+          upPrices.push({ tickOffset: `+${upCount}`, price: curUp, isLimitUp: curUp >= upLimit });
         }
 
         let curDown = calcPrice;
@@ -1491,15 +1337,14 @@
         while (curDown > downLimit && downCount < 400) {
           curDown = stepTick(curDown, -1);
           downCount++;
-          const isOpen = actualOpenPrice !== null && Math.abs(curDown - actualOpenPrice) < 0.0001;
-          downPrices.push({ tickOffset: `-${downCount}`, price: curDown, isLimitDown: curDown <= downLimit, isOpen: isOpen });
+          downPrices.push({ tickOffset: `-${downCount}`, price: curDown, isLimitDown: curDown <= downLimit });
         }
       } else {
         const numTicks = parseInt(document.getElementById('tickRange').value, 10);
         let curUp = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
           curUp = stepTick(curUp, 1);
-          upPrices.push({ tickOffset: `+${i}`, price: curUp, isOpen: false });
+          upPrices.push({ tickOffset: `+${i}`, price: curUp });
         }
 
         let curDown = calcPrice;
@@ -1509,18 +1354,11 @@
         }
       }
 
-      let baseLabel = '';
-      const isBaseOpen = actualOpenPrice !== null && Math.abs(calcPrice - actualOpenPrice) < 0.0001;
-      if (hasValidOrderPrice) {
-        baseLabel = data.orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進');
-        if (isBaseOpen) baseLabel += ' (開盤)';
-      } else {
-        baseLabel = '開盤';
-      }
+      let baseLabel = data.orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進');
 
       const list = [
         ...upPrices.reverse(),
-        { tickOffset: baseLabel, price: calcPrice, isBaseRow: true, isOpen: isBaseOpen },
+        { tickOffset: baseLabel, price: calcPrice, isBaseRow: true },
         ...downPrices
       ];
 
@@ -1533,8 +1371,6 @@
 
         if (item.isBaseRow) {
           tr.className = 'buy-row';
-        } else if (item.isOpen) {
-          tr.className = 'open-row';
         } else if (item.isLimitUp) {
           tr.className = 'limit-row';
         } else if (item.isLimitDown) {
@@ -1554,7 +1390,6 @@
         }
 
         let tag = item.tickOffset;
-        if (item.isOpen && !item.isBaseRow) tag += ' (開盤)';
         if (item.isLimitUp) tag += ' (漲停)';
         if (item.isLimitDown) tag += ' (跌停)';
 
@@ -1563,7 +1398,7 @@
         let roiTd = displayConfig.colRoi ? `<td class="${profitClass}">${profitSign}${res.roi}%</td>` : '';
 
         tr.innerHTML = `
-          <td class="text-center ${item.isBaseRow || item.isOpen ? '' : 'muted-text'}">${tag}</td>
+          <td class="text-center ${item.isBaseRow ? '' : 'muted-text'}">${tag}</td>
           <td><strong>${item.price.toFixed(2)}</strong></td>
           ${costTd}
           ${profitTd}
@@ -1605,11 +1440,11 @@
         `;
       }
 
-      if (hasLiveQuote && baseStockPrice > 0) {
+      if (hasPrice && baseStockPrice > 0) {
         if (displayConfig.summaryTick) {
           summaryHtml += `
             <div class="summary-box">
-              <div class="summary-title">開盤漲停價 (+10%)</div>
+              <div class="summary-title">漲停價 (+10%)</div>
               <div class="summary-value highlight-val">${upLimit.toFixed(2)} 元</div>
             </div>
           `;
@@ -1617,8 +1452,8 @@
         if (displayConfig.summaryRate) {
           summaryHtml += `
             <div class="summary-box">
-              <div class="summary-title">開盤跌停價 (-10%)</div>
-              <div class="summary-value highlight-down">${downLimit.toFixed(2)} 元</div>
+              <div class="summary-title">跌停價 (-10%)</div>
+              <div class="summary-value" style="color:var(--loss);">${downLimit.toFixed(2)} 元</div>
             </div>
           `;
         }
@@ -1646,145 +1481,48 @@
       summaryGrid.style.display = summaryHtml.trim() === '' ? 'none' : 'grid';
     }
 
-    async function queryLiveStockData(symbol) {
-      const sym = symbol.trim().toUpperCase();
-      if (!sym) return null;
-
-      const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${sym}.tw|otc_${sym}.tw&json=1&delay=0&_t=${Date.now()}`;
-      
-      // 使用更穩定的多重公開代理池
-      const proxyUrls = [
-        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
-      ];
-
-      let data = null;
-      for (const proxyUrl of proxyUrls) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5秒超時即切換下一個代理
-          const res = await fetch(proxyUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
-
-          if (res.ok) {
-            const json = await res.json();
-            data = json.contents ? JSON.parse(json.contents) : json;
-            if (data && data.msgArray && data.msgArray.length > 0) break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      if (!data || !data.msgArray || data.msgArray.length === 0) return null;
-
-      let stock = data.msgArray.find(s => s.n && s.n.trim() !== '') || data.msgArray[0];
-      const name = stock.n || sym;
-      const prevClose = parseFloat(stock.y) || 0;
-      let currentPrice = parseFloat(stock.z);
-
-      if (isNaN(currentPrice) || currentPrice === 0) {
-        if (stock.a && stock.a.split('_')[0]) currentPrice = parseFloat(stock.a.split('_')[0]);
-        else if (stock.b && stock.b.split('_')[0]) currentPrice = parseFloat(stock.b.split('_')[0]);
-        else currentPrice = prevClose;
-      }
-
-      const openPrice = parseFloat(stock.o) || prevClose;
-      const diff = (currentPrice && prevClose) ? (currentPrice - prevClose) : 0;
-      const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
-      const time = stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false });
-
-      const parseFiveList = (pStr, vStr) => {
-        const prices = (pStr || '').split('_').filter(v => v !== '');
-        const vols = (vStr || '').split('_').filter(v => v !== '');
-        const list = [];
-        for (let i = 0; i < 5; i++) {
-          list.push({
-            price: prices[i] ? parseFloat(prices[i]) : null,
-            vol: vols[i] ? parseInt(vols[i], 10) : null
-          });
-        }
-        return list;
-      };
-
-      return {
-        symbol: sym,
-        name,
-        currentPrice: currentPrice || prevClose,
-        openPrice,
-        prevClose,
-        diff,
-        diffPercent,
-        time,
-        bids: parseFiveList(stock.b, stock.g),
-        asks: parseFiveList(stock.a, stock.f)
-      };
-    }
-
-    async function fetchLiveQuote(isManual = false) {
-      const now = Date.now();
-      // 防止手動按太快（1秒內只能按一次）
-      if (isFetching || (isManual && now - lastFetchTime < 1000)) return;
-      lastFetchTime = now;
-
+    function applyQuickPrice() {
       const input = document.getElementById('quoteSymbolInput');
-      const symbol = input.value.trim().toUpperCase();
-
-      if (!symbol) {
-        if (isManual) alert('請先輸入台股股票代號（例如 2330 或 1815）');
-        tabsData[currentTab].symbol = '';
-        tabsData[currentTab].quote = null;
-        renderQuoteBanner(null);
-        restartAutoRefresh();
-        saveState();
-        renderTable();
+      const val = input.value.trim();
+      if (!val) {
+        alert('請輸入代號與當前現價（例如：2367 旺宏 102，或直接輸入價格 102）');
         return;
       }
 
-      isFetching = true;
-      const btn = document.getElementById('fetchQuoteBtn');
-      if (isManual) {
-        btn.disabled = true;
-        btn.innerText = '連線中...';
+      // 嘗試從輸入中解析出數字作為現價
+      const parts = val.split(/\s+/);
+      let symbol = parts[0];
+      let price = null;
+
+      if (parts.length > 1) {
+        price = parseFloat(parts[parts.length - 1]);
+      } else if (!isNaN(parseFloat(val))) {
+        price = parseFloat(val);
       }
 
-      try {
-        const quoteObj = await queryLiveStockData(symbol);
-        if (!quoteObj) throw new Error('查無此股票資料');
-
+      if (price !== null && !isNaN(price) && price > 0) {
         tabsData[currentTab].symbol = symbol;
-        tabsData[currentTab].name = `${symbol} ${quoteObj.name}`;
-        tabsData[currentTab].quote = quoteObj;
-
-        if (isManual && tabsData[currentTab].orders.length > 0 && quoteObj.currentPrice > 0) {
-          if (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined) {
-            tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
-          }
+        tabsData[currentTab].currentPrice = price;
+        tabsData[currentTab].name = symbol.length <= 6 ? `${symbol} 現價${price}` : symbol;
+        
+        // 若第一筆單價格為空，自動帶入現價
+        if (tabsData[currentTab].orders.length > 0 && (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined)) {
+          tabsData[currentTab].orders[0].price = price;
         }
 
-        renderTabs();
-        updateTabSettingLabels();
-        renderQuoteBanner(quoteObj);
+        renderQuoteBanner(price);
         renderOrderRows();
         renderTable();
         saveState();
-
-      } catch (err) {
-        console.error(err);
-        if (isManual) alert('抓取即時行情失敗，請確認代號正確或網路連線正常。');
-      } finally {
-        isFetching = false;
-        if (isManual) {
-          btn.disabled = false;
-          btn.innerText = '同步';
-        }
+      } else {
+        alert('無法識別價格，請輸入正確格式（例如：2367 102）');
       }
     }
 
     function clearQuoteInput() {
       document.getElementById('quoteSymbolInput').value = '';
       tabsData[currentTab].symbol = '';
-      tabsData[currentTab].quote = null;
+      tabsData[currentTab].currentPrice = null;
       tabsData[currentTab].name = `標的 ${currentTab + 1}`;
       if (tabsData[currentTab].orders.length > 0) {
         tabsData[currentTab].orders[0].price = null;
@@ -1792,73 +1530,22 @@
       renderTabs();
       updateTabSettingLabels();
       renderQuoteBanner(null);
-      restartAutoRefresh();
       renderOrderRows();
       renderTable();
       saveState();
     }
 
-    function setOrderPriceDirect(price) {
-      if (!price || isNaN(price) || tabsData[currentTab].orders.length === 0) return;
-      tabsData[currentTab].orders[0].price = parseFloat(price);
-      renderOrderRows();
-      renderTable();
-      saveState();
-    }
-
-    function renderQuoteBanner(q) {
+    function renderQuoteBanner(price) {
       const box = document.getElementById('quoteInfoBox');
-      const fiveCard = document.getElementById('fiveOrderCard');
-      const liveDot = document.getElementById('liveDot');
+      const data = tabsData[currentTab];
 
-      if (!q || !tabsData[currentTab].symbol) {
+      if (!price || price <= 0 || !data.symbol) {
         box.style.display = 'none';
-        fiveCard.style.display = 'none';
         return;
       }
 
       box.style.display = 'flex';
-      document.getElementById('quoteStockName').innerText = `${q.name} (${q.symbol}) ${q.currentPrice.toFixed(2)}`;
-      
-      const diffEl = document.getElementById('quotePriceDiff');
-      const isUp = q.diff > 0;
-      const isDown = q.diff < 0;
-      const sign = isUp ? '+' : '';
-      const color = isUp ? 'var(--profit)' : (isDown ? 'var(--loss)' : 'var(--text-muted)');
-      
-      diffEl.style.color = color;
-      diffEl.innerText = `${sign}${q.diff.toFixed(2)} (${sign}${q.diffPercent.toFixed(2)}%)`;
-      
-      liveDot.style.display = autoRefresh ? 'inline-block' : 'none';
-      document.getElementById('quoteTimeText').innerText = `${q.time}`;
-
-      if (showFiveOrder && q.bids && q.asks) {
-        fiveCard.style.display = 'block';
-        const tbody = document.getElementById('fiveOrderBody');
-        tbody.innerHTML = '';
-
-        for (let i = 0; i < 5; i++) {
-          const bid = q.bids[i] || { price: null, vol: null };
-          const ask = q.asks[i] || { price: null, vol: null };
-
-          const bidPriceText = bid.price ? bid.price.toFixed(2) : '-';
-          const bidVolText = bid.vol !== null ? bid.vol : '-';
-          const askPriceText = ask.price ? ask.price.toFixed(2) : '-';
-          const askVolText = ask.vol !== null ? ask.vol : '-';
-
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class="five-bid-vol">${bidVolText}</td>
-            <td class="five-bid-price ${bid.price ? 'order-clickable' : ''}" onclick="setOrderPriceDirect(${bid.price})">${bidPriceText}</td>
-            <td style="width:12px; text-align:center; color:#38383a;">|</td>
-            <td class="five-ask-price ${ask.price ? 'order-clickable' : ''}" onclick="setOrderPriceDirect(${ask.price})">${askPriceText}</td>
-            <td class="five-ask-vol">${askVolText}</td>
-          `;
-          tbody.appendChild(tr);
-        }
-      } else {
-        fiveCard.style.display = 'none';
-      }
+      document.getElementById('quoteStockName').innerText = `${data.name} (現價: ${price.toFixed(2)})`;
     }
 
     /* ---------------- 庫存管理核心邏輯 ---------------- */
@@ -2003,31 +1690,7 @@
     }
 
     async function syncAllInventory() {
-      const btn = document.getElementById('syncAllInvBtn');
-      btn.disabled = true;
-      btn.innerText = '同步中...';
-
-      for (let i = 0; i < inventoryData.length; i++) {
-        const inv = inventoryData[i];
-        if (inv.symbol && inv.symbol.trim() !== '') {
-          try {
-            const q = await queryLiveStockData(inv.symbol);
-            if (q) {
-              inv.name = `${q.symbol} ${q.name}`;
-              inv.currentPrice = q.currentPrice;
-              inv.diff = q.diff;
-              inv.diffPercent = q.diffPercent;
-            }
-          } catch (e) {
-            console.error(e);
-          }
-        }
-      }
-
-      renderInventoryList();
-      saveState();
-      btn.disabled = false;
-      btn.innerText = '一鍵同步全部持股現價';
+      alert('庫存現價可直接於上方輸入框填入當前現價，系統將即時幫您計算最新損益。');
     }
 
     function recalculateInventorySummary() {
@@ -2084,7 +1747,6 @@
         const isLoss = res.netProfit < 0;
         const profitSign = isProfit ? '+' : '';
         const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
-        const curPriceColor = inv.diff > 0 ? 'var(--profit)' : (inv.diff < 0 ? 'var(--loss)' : 'var(--text)');
 
         const card = document.createElement('div');
         card.className = 'inventory-item-card';
@@ -2115,11 +1777,12 @@
 
           <div style="display:flex; gap:6px; margin-bottom:8px;">
             <input type="text" class="quote-input" placeholder="代號 Ex. 2330" value="${inv.symbol || ''}" style="flex:1;" onchange="updateInvField(${invIdx}, 'symbol', this.value.toUpperCase())">
-            <select class="input-control" style="width:72px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'type', this.value)">
+            <input type="number" class="quote-input" placeholder="當前現價" value="${inv.currentPrice !== null ? inv.currentPrice : ''}" step="any" style="width:90px;" oninput="updateInvField(${invIdx}, 'currentPrice', parseFloat(this.value) || null)">
+            <select class="input-control" style="width:64px; text-align-last:center; padding-right:4px;" onchange="updateInvField(${invIdx}, 'type', this.value)">
               <option value="swing" ${inv.type === 'swing' ? 'selected' : ''}>波段</option>
               <option value="warrant" ${inv.type === 'warrant' ? 'selected' : ''}>權證</option>
             </select>
-            <select class="input-control" style="width:72px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'unit', this.value)">
+            <select class="input-control" style="width:64px; text-align-last:center; padding-right:4px;" onchange="updateInvField(${invIdx}, 'unit', this.value)">
               <option value="lot" ${inv.unit === 'lot' ? 'selected' : ''}>整張</option>
               <option value="odd" ${inv.unit === 'odd' ? 'selected' : ''}>零股</option>
             </select>
@@ -2128,7 +1791,7 @@
           <div class="inv-stats-row">
             <div>
               <div class="inv-stat-label">當前現價</div>
-              <div class="inv-stat-val" style="color:${curPriceColor};">${res.curPrice > 0 ? res.curPrice.toFixed(2) : '--'}</div>
+              <div class="inv-stat-val" style="color:var(--primary);">${res.curPrice > 0 ? res.curPrice.toFixed(2) : '--'}</div>
             </div>
             <div>
               <div class="inv-stat-label">買進均價 / 股數</div>
@@ -2154,23 +1817,6 @@
       recalculateInventorySummary();
     }
 
-    function restartAutoRefresh() {
-      if (refreshTimer) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
-      }
-      if (!autoRefresh) return;
-
-      const symbol = tabsData[currentTab].symbol;
-      if (symbol && symbol.trim() !== '') {
-        refreshTimer = setInterval(() => {
-          if (tabsData[currentTab].symbol && !document.hidden && currentMode !== 'inventory') {
-            fetchLiveQuote(false);
-          }
-        }, refreshInterval);
-      }
-    }
-
     function openSettings() {
       updateTabSettingLabels();
       document.getElementById('settingsModal').style.display = 'flex';
@@ -2192,7 +1838,6 @@
         saveState();
         renderTabs();
         syncUIFromCurrentTab();
-        restartAutoRefresh();
         closeSettings();
       }
     }
@@ -2209,28 +1854,9 @@
       renderTable();
     });
 
-    document.getElementById('quoteSymbolInput').addEventListener('input', (e) => {
-      const val = e.target.value.trim().toUpperCase();
-      if (!val) {
-        tabsData[currentTab].symbol = '';
-        tabsData[currentTab].quote = null;
-        renderQuoteBanner(null);
-        restartAutoRefresh();
-        renderTable();
-        saveState();
-      }
-    });
-
     document.getElementById('quoteSymbolInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        fetchLiveQuote(true);
-        restartAutoRefresh();
-      }
-    });
-
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && autoRefresh) {
-        if (currentMode !== 'inventory' && tabsData[currentTab].symbol) fetchLiveQuote(false);
+        applyQuickPrice();
       }
     });
 
