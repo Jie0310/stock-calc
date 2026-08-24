@@ -879,7 +879,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v31_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v33_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1650,10 +1650,27 @@
       if (!sym) return null;
 
       const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${sym}.tw|otc_${sym}.tw&json=1&delay=0&_=${Date.now()}`;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
       
-      const res = await fetch(proxyUrl);
-      const data = await res.json();
+      // 使用雙重代理備援：先試用 allorigins，若失敗自動切換 corsproxy
+      const proxyUrls = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+      ];
+
+      let data = null;
+      for (const proxyUrl of proxyUrls) {
+        try {
+          const res = await fetch(proxyUrl);
+          if (res.ok) {
+            const json = await res.json();
+            // 有時候 allorigins 會把內容包在 contents 裡，或直接回傳 JSON
+            data = json.contents ? JSON.parse(json.contents) : json;
+            if (data && data.msgArray && data.msgArray.length > 0) break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
 
       if (!data || !data.msgArray || data.msgArray.length === 0) return null;
 
