@@ -645,6 +645,19 @@
     .reset-btn:active {
       background: rgba(255, 69, 58, 0.3);
     }
+    .diag-box {
+      background: rgba(255, 69, 58, 0.08);
+      border: 1px solid rgba(255, 69, 58, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-top: 8px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      display: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -692,6 +705,8 @@
           </div>
         </div>
       </div>
+
+      <div class="diag-box" id="diagBox"></div>
 
       <div class="five-order-card" id="fiveOrderCard" style="display:none;">
         <div class="five-order-header">
@@ -879,7 +894,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v35_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v38_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1646,37 +1661,71 @@
       summaryGrid.style.display = summaryHtml.trim() === '' ? 'none' : 'grid';
     }
 
+    function showDiag(text){
+      const box = document.getElementById('diagBox');
+      if(!box) return;
+      box.style.display = 'block';
+      box.textContent = text;
+    }
+    function clearDiag(){
+      const box = document.getElementById('diagBox');
+      if(!box) return;
+      box.style.display = 'none';
+      box.textContent = '';
+    }
+
     async function queryLiveStockData(symbol) {
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
 
       const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${sym}.tw|otc_${sym}.tw&json=1&delay=0&_t=${Date.now()}`;
-      
-      // 使用更穩定的多重公開代理池
-      const proxyUrls = [
-        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+
+      // 使用純粹的 fetch 代理池，避免 AbortSignal 物件無法 clone 的問題
+      const attempts = [
+        { label: 'allorigins', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}` },
+        { label: 'corsproxy.io', url: `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}` },
+        { label: 'codetabs', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}` }
       ];
 
       let data = null;
-      for (const proxyUrl of proxyUrls) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5秒超時即切換下一個代理
-          const res = await fetch(proxyUrl, { signal: controller.signal });
-          clearTimeout(timeoutId);
+      const log = [];
 
-          if (res.ok) {
-            const json = await res.json();
-            data = json.contents ? JSON.parse(json.contents) : json;
-            if (data && data.msgArray && data.msgArray.length > 0) break;
+      for (const attempt of attempts) {
+        try {
+          const res = await fetch(attempt.url, { cache: 'no-store' });
+          if (!res.ok) {
+            log.push(`${attempt.label}：HTTP ${res.status}`);
+            continue;
+          }
+
+          const text = await res.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch (e) {
+            log.push(`${attempt.label}：回傳格式非 JSON`);
+            continue;
+          }
+
+          const candidate = parsed.contents ? JSON.parse(parsed.contents) : parsed;
+
+          if (candidate && candidate.msgArray && candidate.msgArray.length > 0) {
+            data = candidate;
+            log.push(`${attempt.label}：成功`);
+            break;
+          } else {
+            log.push(`${attempt.label}：查無此代號或無資料`);
           }
         } catch (e) {
-          continue;
+          log.push(`${attempt.label}：連線失敗`);
         }
       }
 
-      if (!data || !data.msgArray || data.msgArray.length === 0) return null;
+      if (!data) {
+        showDiag('查詢失敗，逐步紀錄：\n' + log.join('\n'));
+        return null;
+      }
+      clearDiag();
 
       let stock = data.msgArray.find(s => s.n && s.n.trim() !== '') || data.msgArray[0];
       const name = stock.n || sym;
@@ -1723,7 +1772,6 @@
 
     async function fetchLiveQuote(isManual = false) {
       const now = Date.now();
-      // 防止手動按太快（1秒內只能按一次）
       if (isFetching || (isManual && now - lastFetchTime < 1000)) return;
       lastFetchTime = now;
 
@@ -1746,6 +1794,7 @@
       if (isManual) {
         btn.disabled = true;
         btn.innerText = '連線中...';
+        clearDiag();
       }
 
       try {
@@ -1771,7 +1820,7 @@
 
       } catch (err) {
         console.error(err);
-        if (isManual) alert('抓取即時行情失敗，請確認代號正確或網路連線正常。');
+        if (isManual) alert('抓取即時行情失敗，詳細記錄已顯示在畫面上。');
       } finally {
         isFetching = false;
         if (isManual) {
@@ -1789,6 +1838,7 @@
       if (tabsData[currentTab].orders.length > 0) {
         tabsData[currentTab].orders[0].price = null;
       }
+      clearDiag();
       renderTabs();
       updateTabSettingLabels();
       renderQuoteBanner(null);
@@ -1860,8 +1910,6 @@
         fiveCard.style.display = 'none';
       }
     }
-
-    /* ---------------- 庫存管理核心邏輯 ---------------- */
 
     function addInventoryStock() {
       const newStock = {
