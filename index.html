@@ -1674,100 +1674,49 @@
       box.textContent = '';
     }
 
+    // 改用你專屬的 Cloudflare Worker 網址
     async function queryLiveStockData(symbol) {
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
 
-      const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${sym}.tw|otc_${sym}.tw&json=1&delay=0&_t=${Date.now()}`;
+      const workerUrl = `https://twse-proxy.yijhuang8931.workers.dev?sym=${sym}`;
 
-      // 使用純粹的 fetch 代理池，避免 AbortSignal 物件無法 clone 的問題
-      const attempts = [
-        { label: 'allorigins', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}` },
-        { label: 'corsproxy.io', url: `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}` },
-        { label: 'codetabs', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}` }
-      ];
+      try {
+        const res = await fetch(workerUrl, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-      let data = null;
-      const log = [];
-
-      for (const attempt of attempts) {
-        try {
-          const res = await fetch(attempt.url, { cache: 'no-store' });
-          if (!res.ok) {
-            log.push(`${attempt.label}：HTTP ${res.status}`);
-            continue;
-          }
-
-          const text = await res.text();
-          let parsed;
-          try {
-            parsed = JSON.parse(text);
-          } catch (e) {
-            log.push(`${attempt.label}：回傳格式非 JSON`);
-            continue;
-          }
-
-          const candidate = parsed.contents ? JSON.parse(parsed.contents) : parsed;
-
-          if (candidate && candidate.msgArray && candidate.msgArray.length > 0) {
-            data = candidate;
-            log.push(`${attempt.label}：成功`);
-            break;
-          } else {
-            log.push(`${attempt.label}：查無此代號或無資料`);
-          }
-        } catch (e) {
-          log.push(`${attempt.label}：連線失敗`);
+        const data = await res.json();
+        if (!data || !data.chart || !data.chart.result || data.chart.result.length === 0) {
+          throw new Error('查無此股票資料');
         }
-      }
 
-      if (!data) {
-        showDiag('查詢失敗，逐步紀錄：\n' + log.join('\n'));
+        clearDiag();
+        const result = data.chart.result[0];
+        const meta = result.meta;
+        const name = meta.longName || meta.symbol || sym;
+        const currentPrice = meta.regularMarketPrice || meta.previousClose;
+        const prevClose = meta.previousClose || currentPrice;
+        const openPrice = meta.regularMarketOpen || prevClose;
+        const diff = currentPrice - prevClose;
+        const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
+        const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+
+        return {
+          symbol: sym,
+          name,
+          currentPrice,
+          openPrice,
+          prevClose,
+          diff,
+          diffPercent,
+          time,
+          bids: [], 
+          asks: []
+        };
+      } catch (e) {
+        showDiag(`查詢失敗：${e.message}`);
         return null;
       }
-      clearDiag();
-
-      let stock = data.msgArray.find(s => s.n && s.n.trim() !== '') || data.msgArray[0];
-      const name = stock.n || sym;
-      const prevClose = parseFloat(stock.y) || 0;
-      let currentPrice = parseFloat(stock.z);
-
-      if (isNaN(currentPrice) || currentPrice === 0) {
-        if (stock.a && stock.a.split('_')[0]) currentPrice = parseFloat(stock.a.split('_')[0]);
-        else if (stock.b && stock.b.split('_')[0]) currentPrice = parseFloat(stock.b.split('_')[0]);
-        else currentPrice = prevClose;
-      }
-
-      const openPrice = parseFloat(stock.o) || prevClose;
-      const diff = (currentPrice && prevClose) ? (currentPrice - prevClose) : 0;
-      const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
-      const time = stock.t || new Date().toLocaleTimeString('zh-TW', { hour12: false });
-
-      const parseFiveList = (pStr, vStr) => {
-        const prices = (pStr || '').split('_').filter(v => v !== '');
-        const vols = (vStr || '').split('_').filter(v => v !== '');
-        const list = [];
-        for (let i = 0; i < 5; i++) {
-          list.push({
-            price: prices[i] ? parseFloat(prices[i]) : null,
-            vol: vols[i] ? parseInt(vols[i], 10) : null
-          });
-        }
-        return list;
-      };
-
-      return {
-        symbol: sym,
-        name,
-        currentPrice: currentPrice || prevClose,
-        openPrice,
-        prevClose,
-        diff,
-        diffPercent,
-        time,
-        bids: parseFiveList(stock.b, stock.g),
-        asks: parseFiveList(stock.a, stock.f)
-      };
     }
 
     async function fetchLiveQuote(isManual = false) {
@@ -1882,7 +1831,7 @@
       liveDot.style.display = autoRefresh ? 'inline-block' : 'none';
       document.getElementById('quoteTimeText').innerText = `${q.time}`;
 
-      if (showFiveOrder && q.bids && q.asks) {
+      if (showFiveOrder && q.bids && q.asks && q.bids.length > 0) {
         fiveCard.style.display = 'block';
         const tbody = document.getElementById('fiveOrderBody');
         tbody.innerHTML = '';
