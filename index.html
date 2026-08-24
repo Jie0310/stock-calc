@@ -529,7 +529,6 @@
     .loss-text { color: var(--loss); font-weight: 700; }
     .muted-text { color: var(--text-muted); font-size: 0.72rem; }
 
-    /* 庫存專用樣式 */
     .inventory-item-card {
       background: var(--card-bg);
       border-radius: 12px;
@@ -571,7 +570,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Modal */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -684,7 +682,6 @@
     <div class="order-btn" id="btnSell" onclick="setDirection('sell')">賣出 (做空)</div>
   </div>
 
-  <!-- 計算機區塊 -->
   <div id="calcView">
     <div class="card">
       <div class="quote-bar">
@@ -765,7 +762,6 @@
     </div>
   </div>
 
-  <!-- 庫存區塊 -->
   <div id="inventoryView" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px;">
       <button type="button" class="quote-btn" id="syncAllInvBtn" onclick="syncAllInventory()" style="flex:1; padding:9px 0;">
@@ -781,7 +777,6 @@
     <div id="inventoryList"></div>
   </div>
 
-  <!-- 設定 Modal -->
   <div class="modal-overlay" id="settingsModal" onclick="closeSettings(event)">
     <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -863,11 +858,11 @@
         <input type="checkbox" id="showSummaryTotal" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
       <div class="input-row">
-        <span class="input-label">跳動單位 / 開盤漲停</span>
+        <span class="input-label">漲停賺多少 / 跳動單位</span>
         <input type="checkbox" id="showSummaryTick" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
       <div class="input-row">
-        <span class="input-label">模式與稅率 / 開盤跌停</span>
+        <span class="input-label">跌停賠多少 / 模式與稅率</span>
         <input type="checkbox" id="showSummaryRate" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
 
@@ -894,7 +889,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v38_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v40_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1600,6 +1595,15 @@
         }
       }
 
+      let upLimitProfitText = '--';
+      let downLimitLossText = '--';
+      if (hasLiveQuote && baseStockPrice > 0) {
+        const upRes = calculateTrade(calcPrice, upLimit, totalShares, discount, taxRate, isShort);
+        const downRes = calculateTrade(calcPrice, downLimit, totalShares, discount, taxRate, isShort);
+        upLimitProfitText = `+${upRes.netProfit.toLocaleString()} 元`;
+        downLimitLossText = `${downRes.netProfit.toLocaleString()} 元`;
+      }
+
       let summaryHtml = '';
 
       if (displayConfig.summaryBreakeven) {
@@ -1624,16 +1628,16 @@
         if (displayConfig.summaryTick) {
           summaryHtml += `
             <div class="summary-box">
-              <div class="summary-title">開盤漲停價 (+10%)</div>
-              <div class="summary-value highlight-val">${upLimit.toFixed(2)} 元</div>
+              <div class="summary-title">漲停賺多少 (+10%)</div>
+              <div class="summary-value highlight-val">${upLimitProfitText}</div>
             </div>
           `;
         }
         if (displayConfig.summaryRate) {
           summaryHtml += `
             <div class="summary-box">
-              <div class="summary-title">開盤跌停價 (-10%)</div>
-              <div class="summary-value highlight-down">${downLimit.toFixed(2)} 元</div>
+              <div class="summary-title">跌停賠多少 (-10%)</div>
+              <div class="summary-value highlight-down">${downLimitLossText}</div>
             </div>
           `;
         }
@@ -1674,7 +1678,6 @@
       box.textContent = '';
     }
 
-    // 改用你專屬的 Cloudflare Worker 網址
     async function queryLiveStockData(symbol) {
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
@@ -1693,7 +1696,9 @@
         clearDiag();
         const result = data.chart.result[0];
         const meta = result.meta;
-        const name = meta.longName || meta.symbol || sym;
+        
+        // 自動使用 Yahoo API 提供的簡稱或代號
+        const name = meta.shortName || meta.symbol || sym;
         const currentPrice = meta.regularMarketPrice || meta.previousClose;
         const prevClose = meta.previousClose || currentPrice;
         const openPrice = meta.regularMarketOpen || prevClose;
@@ -1755,9 +1760,7 @@
         tabsData[currentTab].quote = quoteObj;
 
         if (isManual && tabsData[currentTab].orders.length > 0 && quoteObj.currentPrice > 0) {
-          if (tabsData[currentTab].orders[0].price === null || tabsData[currentTab].orders[0].price === undefined) {
-            tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
-          }
+          tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
         }
 
         renderTabs();
