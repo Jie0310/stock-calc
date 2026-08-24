@@ -879,7 +879,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v33_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v35_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -890,6 +890,7 @@
     let refreshInterval = 5000;
     let refreshTimer = null;
     let isFetching = false;
+    let lastFetchTime = 0;
 
     let enabledTabs = [true, true, true];
 
@@ -1649,21 +1650,24 @@
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
 
-      const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${sym}.tw|otc_${sym}.tw&json=1&delay=0&_=${Date.now()}`;
+      const targetUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_${sym}.tw|otc_${sym}.tw&json=1&delay=0&_t=${Date.now()}`;
       
-      // 使用雙重代理備援：先試用 allorigins，若失敗自動切換 corsproxy
+      // 使用更穩定的多重公開代理池
       const proxyUrls = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
       ];
 
       let data = null;
       for (const proxyUrl of proxyUrls) {
         try {
-          const res = await fetch(proxyUrl);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5秒超時即切換下一個代理
+          const res = await fetch(proxyUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
           if (res.ok) {
             const json = await res.json();
-            // 有時候 allorigins 會把內容包在 contents 裡，或直接回傳 JSON
             data = json.contents ? JSON.parse(json.contents) : json;
             if (data && data.msgArray && data.msgArray.length > 0) break;
           }
@@ -1718,7 +1722,11 @@
     }
 
     async function fetchLiveQuote(isManual = false) {
-      if (isFetching) return;
+      const now = Date.now();
+      // 防止手動按太快（1秒內只能按一次）
+      if (isFetching || (isManual && now - lastFetchTime < 1000)) return;
+      lastFetchTime = now;
+
       const input = document.getElementById('quoteSymbolInput');
       const symbol = input.value.trim().toUpperCase();
 
