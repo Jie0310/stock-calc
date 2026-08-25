@@ -1701,13 +1701,13 @@ async function queryLiveStockData(symbol) {
         clearDiag();
         const name = meta.shortName || meta.symbol || sym;
         
-        // 優先讀取即時價，若收盤後無即時價則自動退回抓取收盤價或前收盤價
-        const currentPrice = meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== 0 
-          ? meta.regularMarketPrice 
-          : (meta.regularMarketClose || meta.previousClose || 0);
+        // 優先順序：當日收盤價(regularMarketClose) -> 現價(regularMarketPrice) -> 昨收(previousClose)
+        const currentPrice = (meta.regularMarketClose !== undefined && meta.regularMarketClose !== 0)
+          ? meta.regularMarketClose
+          : (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== 0 ? meta.regularMarketPrice : (meta.previousClose || 0));
 
         const prevClose = meta.regularMarketPreviousClose || meta.previousClose || currentPrice;
-        const openPrice = meta.regularMarketOpen !== undefined && meta.regularMarketOpen !== 0 
+        const openPrice = (meta.regularMarketOpen !== undefined && meta.regularMarketOpen !== 0) 
           ? meta.regularMarketOpen 
           : prevClose;
 
