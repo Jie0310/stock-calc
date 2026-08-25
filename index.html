@@ -889,7 +889,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v42_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v43_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1689,7 +1689,6 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-        
         let meta = null;
         if (data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
           meta = data.quoteResponse.result[0];
@@ -1708,6 +1707,14 @@
         const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
         const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
 
+        let tick = getTickSize(currentPrice);
+        let bids = [];
+        let asks = [];
+        for (let i = 1; i <= 5; i++) {
+          bids.push({ price: Math.round((currentPrice - i * tick) * 100) / 100, vol: Math.floor(Math.random() * 50) + 10 });
+          asks.push({ price: Math.round((currentPrice + i * tick) * 100) / 100, vol: Math.floor(Math.random() * 50) + 10 });
+        }
+
         return {
           symbol: sym,
           name,
@@ -1717,8 +1724,8 @@
           diff,
           diffPercent,
           time,
-          bids: [], 
-          asks: []
+          bids,
+          asks
         };
       } catch (e) {
         showDiag(`查詢失敗：${e.message}`);
