@@ -1678,7 +1678,7 @@
       box.textContent = '';
     }
 
-    async function queryLiveStockData(symbol) {
+async function queryLiveStockData(symbol) {
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
 
@@ -1700,9 +1700,17 @@
 
         clearDiag();
         const name = meta.shortName || meta.symbol || sym;
-        const currentPrice = meta.regularMarketPrice !== undefined ? meta.regularMarketPrice : (meta.previousClose || 0);
+        
+        // 優先讀取即時價，若收盤後無即時價則自動退回抓取收盤價或前收盤價
+        const currentPrice = meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== 0 
+          ? meta.regularMarketPrice 
+          : (meta.regularMarketClose || meta.previousClose || 0);
+
         const prevClose = meta.regularMarketPreviousClose || meta.previousClose || currentPrice;
-        const openPrice = meta.regularMarketOpen !== undefined ? meta.regularMarketOpen : prevClose;
+        const openPrice = meta.regularMarketOpen !== undefined && meta.regularMarketOpen !== 0 
+          ? meta.regularMarketOpen 
+          : prevClose;
+
         const diff = currentPrice - prevClose;
         const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
         const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
