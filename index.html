@@ -889,7 +889,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v40_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v42_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1689,19 +1689,21 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
-        if (!data || !data.chart || !data.chart.result || data.chart.result.length === 0) {
-          throw new Error('查無此股票資料');
+        
+        let meta = null;
+        if (data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
+          meta = data.quoteResponse.result[0];
+        } else if (data.chart && data.chart.result && data.chart.result.length > 0) {
+          meta = data.chart.result[0].meta;
         }
 
+        if (!meta) throw new Error('查無此股票資料');
+
         clearDiag();
-        const result = data.chart.result[0];
-        const meta = result.meta;
-        
-        // 自動使用 Yahoo API 提供的簡稱或代號
         const name = meta.shortName || meta.symbol || sym;
-        const currentPrice = meta.regularMarketPrice || meta.previousClose;
-        const prevClose = meta.previousClose || currentPrice;
-        const openPrice = meta.regularMarketOpen || prevClose;
+        const currentPrice = meta.regularMarketPrice !== undefined ? meta.regularMarketPrice : (meta.previousClose || 0);
+        const prevClose = meta.regularMarketPreviousClose || meta.previousClose || currentPrice;
+        const openPrice = meta.regularMarketOpen !== undefined ? meta.regularMarketOpen : prevClose;
         const diff = currentPrice - prevClose;
         const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
         const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
