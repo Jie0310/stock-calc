@@ -889,7 +889,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'taiwan_stock_calc_v43_data';
+    const STORAGE_KEY = 'taiwan_stock_calc_v44_data';
 
     let currentMode = 'daytrade';
     let currentTab = 0;
@@ -1678,7 +1678,7 @@
       box.textContent = '';
     }
 
-async function queryLiveStockData(symbol) {
+    async function queryLiveStockData(symbol) {
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
 
@@ -1701,7 +1701,6 @@ async function queryLiveStockData(symbol) {
         clearDiag();
         const name = meta.shortName || meta.symbol || sym;
         
-        // 優先順序：當日收盤價(regularMarketClose) -> 現價(regularMarketPrice) -> 昨收(previousClose)
         const currentPrice = (meta.regularMarketClose !== undefined && meta.regularMarketClose !== 0)
           ? meta.regularMarketClose
           : (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== 0 ? meta.regularMarketPrice : (meta.previousClose || 0));
@@ -1949,6 +1948,14 @@ async function queryLiveStockData(symbol) {
       saveState();
     }
 
+    function updateInvCurrentPrice(invIndex, val) {
+      const inv = inventoryData[invIndex];
+      inv.currentPrice = val.trim() === '' ? null : parseFloat(val);
+      updateSingleCardStats(invIndex);
+      recalculateInventorySummary();
+      saveState();
+    }
+
     function calculateInventoryPnl(inv) {
       let invTotalBuyAmt = 0;
       let invTotalShares = 0;
@@ -2021,8 +2028,10 @@ async function queryLiveStockData(symbol) {
 
     async function syncAllInventory() {
       const btn = document.getElementById('syncAllInvBtn');
-      btn.disabled = true;
-      btn.innerText = '同步中...';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '同步中...';
+      }
 
       for (let i = 0; i < inventoryData.length; i++) {
         const inv = inventoryData[i];
@@ -2041,10 +2050,15 @@ async function queryLiveStockData(symbol) {
         }
       }
 
-      renderInventoryList();
+      if (currentMode === 'inventory') {
+        renderInventoryList();
+      }
       saveState();
-      btn.disabled = false;
-      btn.innerText = '一鍵同步全部持股現價';
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = '一鍵同步全部持股現價';
+      }
     }
 
     function recalculateInventorySummary() {
@@ -2068,6 +2082,7 @@ async function queryLiveStockData(symbol) {
       const totalProfitColor = isTotalProfit ? 'var(--profit)' : (isTotalLoss ? 'var(--loss)' : 'var(--text)');
 
       const summaryEl = document.getElementById('invTotalSummary');
+      if (!summaryEl) return;
       summaryEl.innerHTML = `
         <div class="summary-box">
           <div class="summary-title">總投入資金 (含規費)</div>
@@ -2090,6 +2105,7 @@ async function queryLiveStockData(symbol) {
 
     function renderInventoryList() {
       const container = document.getElementById('inventoryList');
+      if (!container) return;
       container.innerHTML = '';
 
       inventoryData.forEach((inv, invIdx) => {
@@ -2101,7 +2117,7 @@ async function queryLiveStockData(symbol) {
         const isLoss = res.netProfit < 0;
         const profitSign = isProfit ? '+' : '';
         const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
-        const curPriceColor = inv.diff > 0 ? 'var(--profit)' : (inv.diff < 0 ? 'var(--loss)' : 'var(--text)');
+        const curPriceVal = (inv.currentPrice !== null && inv.currentPrice !== undefined) ? inv.currentPrice : '';
 
         const card = document.createElement('div');
         card.className = 'inventory-item-card';
@@ -2144,8 +2160,8 @@ async function queryLiveStockData(symbol) {
 
           <div class="inv-stats-row">
             <div>
-              <div class="inv-stat-label">當前現價</div>
-              <div class="inv-stat-val" style="color:${curPriceColor};">${res.curPrice > 0 ? res.curPrice.toFixed(2) : '--'}</div>
+              <div class="inv-stat-label">當前現價 (可手動)</div>
+              <input type="number" class="order-input" placeholder="現價" value="${curPriceVal}" step="any" min="0.01" inputmode="decimal" style="background:#1c1c1e; border:1px solid var(--border); border-radius:6px; padding:4px; font-size:0.85rem; font-weight:700; text-align:left; width:100%; margin-top:2px;" oninput="updateInvCurrentPrice(${invIdx}, this.value)">
             </div>
             <div>
               <div class="inv-stat-label">買進均價 / 股數</div>
@@ -2246,8 +2262,13 @@ async function queryLiveStockData(symbol) {
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && autoRefresh) {
-        if (currentMode !== 'inventory' && tabsData[currentTab].symbol) fetchLiveQuote(false);
+      if (!document.hidden) {
+        if (autoRefresh && currentMode !== 'inventory' && tabsData[currentTab].symbol) {
+          fetchLiveQuote(false);
+        }
+        if (currentMode === 'inventory') {
+          syncAllInventory();
+        }
       }
     });
 
