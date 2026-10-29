@@ -976,15 +976,44 @@
       colRoi: true
     };
 
-    const defaultTabsData = [
-      { name: '標的 1', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null },
-      { name: '標的 2', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null },
-      { name: '標的 3', symbol: '', mode: 'daytrade', direction: 'buy', unit: 'lot', orders: [{ price: null, qty: 1 }], quote: null }
-    ];
+    const CALC_MODES = ['daytrade', 'swing', 'warrant'];
+
+    function makeDefaultTabs(mode) {
+      return [1, 2, 3].map(n => ({
+        name: `標的 ${n}`, symbol: '', mode, direction: 'buy', unit: 'lot',
+        orders: [{ price: null, qty: 1 }], quote: null
+      }));
+    }
+
+    function makeDefaultModeTabs() {
+      return { daytrade: makeDefaultTabs('daytrade'), swing: makeDefaultTabs('swing'), warrant: makeDefaultTabs('warrant') };
+    }
 
     const defaultInventory = [];
 
-    let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
+    // 當沖 / 波段 / 權證 各自獨立一組分頁，互不影響
+    let modeTabs = makeDefaultModeTabs();
+    let modeCurrentTab = { daytrade: 0, swing: 0, warrant: 0 };
+    let lastCalcMode = 'daytrade';
+    let tabsData = modeTabs.daytrade;   // 指向目前模式的那一組
+
+    function bindMode(mode) {
+      lastCalcMode = mode;
+      tabsData = modeTabs[mode];
+      currentTab = modeCurrentTab[mode] || 0;
+      if (!enabledTabs[currentTab]) currentTab = Math.max(0, enabledTabs.findIndex(Boolean));
+      modeCurrentTab[mode] = currentTab;
+    }
+
+    function cleanTab(t, mode) {
+      t.mode = mode;
+      if (mode !== 'swing') t.unit = 'lot';
+      if (mode !== 'daytrade') t.direction = 'buy';
+      if (!Array.isArray(t.orders) || t.orders.length === 0) t.orders = [{ price: null, qty: 1 }];
+      // 舊版報價格式（假五檔、開盤價用昨收頂替）直接丟掉，開啟後重新抓
+      if (t.quote && !t.quote.source) t.quote = null;
+      return t;
+    }
     let inventoryData = JSON.parse(JSON.stringify(defaultInventory));
 
     // ================= 共用工具 =================
@@ -1060,25 +1089,34 @@
         if (saved) {
           const parsed = JSON.parse(saved);
 
-          if (Array.isArray(parsed.tabsData)) {
-            tabsData = defaultTabsData.map((d, i) =>
-              Object.assign(JSON.parse(JSON.stringify(d)), parsed.tabsData[i] || {})
-            );
+          if (parsed.modeTabs) {
+            CALC_MODES.forEach(m => {
+              const saved = parsed.modeTabs[m] || [];
+              modeTabs[m] = makeDefaultTabs(m).map((d, i) => Object.assign(d, saved[i] || {}));
+            });
+            if (parsed.modeCurrentTab) Object.assign(modeCurrentTab, parsed.modeCurrentTab);
+            if (CALC_MODES.includes(parsed.lastCalcMode)) lastCalcMode = parsed.lastCalcMode;
+          } else if (Array.isArray(parsed.tabsData)) {
+            // 舊版資料：每個分頁放回它原本所屬的模式
+            parsed.tabsData.forEach((t, i) => {
+              const m = CALC_MODES.includes(t && t.mode) ? t.mode : 'daytrade';
+              if (i < 3) modeTabs[m][i] = Object.assign(makeDefaultTabs(m)[i], t);
+            });
+            if (parsed.currentTab !== undefined && parsed.tabsData[parsed.currentTab]) {
+              const m = CALC_MODES.includes(parsed.tabsData[parsed.currentTab].mode) ? parsed.tabsData[parsed.currentTab].mode : 'daytrade';
+              lastCalcMode = m;
+              modeCurrentTab[m] = parsed.currentTab;
+            }
           }
-          tabsData.forEach(t => {
-            if (!Array.isArray(t.orders) || t.orders.length === 0) t.orders = [{ price: null, qty: 1 }];
-            // 舊版報價格式（假五檔、開盤價用昨收頂替）直接丟掉，開啟後重新抓
-            if (t.quote && !t.quote.source) t.quote = null;
-          });
+          CALC_MODES.forEach(m => modeTabs[m].forEach(t => cleanTab(t, m)));
 
           if (Array.isArray(parsed.inventoryData)) inventoryData = parsed.inventoryData;
-          if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
           if (['daytrade', 'swing', 'warrant', 'inventory'].includes(parsed.currentMode)) {
             currentMode = parsed.currentMode;
           }
+          if (CALC_MODES.includes(currentMode)) lastCalcMode = currentMode;
           if (Array.isArray(parsed.enabledTabs)) enabledTabs = parsed.enabledTabs;
           if (!enabledTabs.some(Boolean)) enabledTabs = [true, true, true];
-          if (!enabledTabs[currentTab]) currentTab = enabledTabs.findIndex(Boolean);
 
           if (parsed.tickRange) document.getElementById('tickRange').value = parsed.tickRange;
           if (parsed.minFee !== undefined) {
@@ -1105,15 +1143,17 @@
       applyDiscountToUI(invDiscount, 'invDiscountSelect', 'invCustomDiscountRow', 'invCustomDiscountInput');
       document.getElementById('autoRefreshToggle').checked = autoRefresh;
       document.getElementById('invSellFullFeeToggle').checked = invSellFullFee;
+      bindMode(lastCalcMode);
       syncDisplayTogglesUI();
     }
 
     function saveState() {
       try {
         const payload = {
-          tabsData,
+          modeTabs,
+          modeCurrentTab,
+          lastCalcMode,
           inventoryData,
-          currentTab,
           currentMode,
           enabledTabs,
           discount: currentDiscount,
@@ -1300,9 +1340,7 @@
 
     function handleTabClick(index) {
       currentTab = index;
-      if (currentMode !== 'inventory') {
-        currentMode = tabsData[index].mode || 'daytrade';   // 模式按鈕跟著分頁走
-      }
+      modeCurrentTab[lastCalcMode] = index;
       clearDiag();
       syncUIFromCurrentTab();
       saveState();
@@ -1375,14 +1413,17 @@
 
     function setMode(mode) {
       currentMode = mode;
-      if (mode !== 'inventory') {
-        tabsData[currentTab].mode = mode;
-        if (mode !== 'swing') tabsData[currentTab].unit = 'lot';
-      }
+      clearDiag();
+      if (mode !== 'inventory') bindMode(mode);
       syncUIFromCurrentTab();
+      updateTabSettingLabels();
       saveState();
       restartAutoRefresh();
-      if (mode === 'inventory' && Date.now() - lastInvSyncTime > 30000) syncAllInventory();
+      if (mode === 'inventory') {
+        if (Date.now() - lastInvSyncTime > 30000) syncAllInventory();
+      } else if (tabsData[currentTab].symbol) {
+        fetchLiveQuote(false);
+      }
     }
 
     function setDirection(dir) {
@@ -1905,17 +1946,19 @@
     async function fetchLiveQuote(isManual = false) {
       const now = Date.now();
       if (!isManual && isFetching) return;                 // 自動更新才讓路，手動同步一律執行
-      if (isManual && now - lastFetchTime < 800) return;
-      lastFetchTime = now;
+      if (isManual) {
+        if (now - lastFetchTime < 800) return;            // 只防連點，不受自動更新影響
+        lastFetchTime = now;
+      }
       const seq = ++fetchSeq;
 
-      const tabIndex = currentTab;
+      const tab = tabsData[currentTab];
       const symbol = document.getElementById('quoteSymbolInput').value.trim().toUpperCase();
 
       if (!symbol) {
         if (isManual) alert('請先輸入台股股票代號（例如 2330 或 1815）');
-        tabsData[tabIndex].symbol = '';
-        tabsData[tabIndex].quote = null;
+        tab.symbol = '';
+        tab.quote = null;
         renderQuoteBanner(null);
         restartAutoRefresh();
         saveState();
@@ -1936,12 +1979,11 @@
         if (seq !== fetchSeq) return;                      // 已有更新的請求，丟掉舊結果
         if (!quoteObj) throw new Error('查無此股票資料');
 
-        const tab = tabsData[tabIndex];
         tab.symbol = symbol;
         tab.name = `${symbol} ${quoteObj.name}`;
         tab.quote = quoteObj;
 
-        if (tabIndex === currentTab && currentMode !== 'inventory') {
+        if (tab === tabsData[currentTab] && currentMode !== 'inventory') {
           clearDiag();
           renderTabs();
           updateTabSettingLabels();
@@ -2365,11 +2407,12 @@
 
     function resetAllTabs() {
       if (confirm('確定要重置所有標的分頁與庫存資料回到預設值嗎？')) {
-        tabsData = JSON.parse(JSON.stringify(defaultTabsData));
+        modeTabs = makeDefaultModeTabs();
+        modeCurrentTab = { daytrade: 0, swing: 0, warrant: 0 };
         inventoryData = JSON.parse(JSON.stringify(defaultInventory));
-        currentTab = 0;
         currentMode = 'daytrade';
         enabledTabs = [true, true, true];
+        bindMode('daytrade');
         syncDisplayTogglesUI();
         saveState();
         syncUIFromCurrentTab();
