@@ -887,6 +887,11 @@
       </div>
 
       <div class="input-row">
+        <span class="input-label">庫存賣出費用以原價估算</span>
+        <input type="checkbox" id="invSellFullFeeToggle" class="custom-checkbox" checked onchange="handleInvSellFullFeeToggle()">
+      </div>
+
+      <div class="input-row">
         <span class="input-label">手續費最低限制</span>
         <select id="minFeeSelect" class="input-control">
           <option value="20" selected>最低 20 元 (標準)</option>
@@ -947,7 +952,8 @@
     let currentTab = 0;
     let minFeeLimit = 20;
     let currentDiscount = 0.25;   // 計算頁（當沖 / 波段 / 權證）
-    let invDiscount = 0.25;       // 庫存帳戶
+    let invDiscount = 0.25;       // 庫存帳戶（買進手續費）
+    let invSellFullFee = true;    // 庫存賣出手續費以原價估算（同多數券商 App 的未實現損益算法）
     let autoRefresh = true;
     let showFiveOrder = true;
     let refreshInterval = 5000;
@@ -1081,6 +1087,7 @@
           }
           if (parsed.discount !== undefined) currentDiscount = parseFloat(parsed.discount);
           if (parsed.invDiscount !== undefined) invDiscount = parseFloat(parsed.invDiscount);
+          if (parsed.invSellFullFee !== undefined) invSellFullFee = parsed.invSellFullFee;
           if (parsed.autoRefresh !== undefined) autoRefresh = parsed.autoRefresh;
           if (parsed.showFiveOrder !== undefined) showFiveOrder = parsed.showFiveOrder;
           if (parsed.refreshInterval !== undefined) {
@@ -1097,6 +1104,7 @@
       applyDiscountToUI(currentDiscount, 'discountSelect', 'customDiscountRow', 'customDiscountInput');
       applyDiscountToUI(invDiscount, 'invDiscountSelect', 'invCustomDiscountRow', 'invCustomDiscountInput');
       document.getElementById('autoRefreshToggle').checked = autoRefresh;
+      document.getElementById('invSellFullFeeToggle').checked = invSellFullFee;
       syncDisplayTogglesUI();
     }
 
@@ -1110,6 +1118,7 @@
           enabledTabs,
           discount: currentDiscount,
           invDiscount,
+          invSellFullFee,
           tickRange: document.getElementById('tickRange').value,
           minFee: minFeeLimit,
           autoRefresh,
@@ -1239,6 +1248,12 @@
         customRow.style.display = 'none';
         invDiscount = parseFloat(val);
       }
+      saveState();
+      if (currentMode === 'inventory') renderInventoryList();
+    }
+
+    function handleInvSellFullFeeToggle() {
+      invSellFullFee = document.getElementById('invSellFullFeeToggle').checked;
       saveState();
       if (currentMode === 'inventory') renderInventoryList();
     }
@@ -2122,7 +2137,8 @@
         }
       });
 
-      const avgBuyPrice = (hasValidBuyPrice && invTotalShares > 0) ? (invTotalBuyAmt / invTotalShares) : 0;
+      // 持有均價含買進手續費（與券商 App 相同）
+      const avgBuyPrice = (hasValidBuyPrice && invTotalShares > 0) ? (invTotalBuyCost / invTotalShares) : 0;
       const curPrice = inv.currentPrice || 0;
 
       let marketVal = 0;
@@ -2131,7 +2147,7 @@
 
       if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
         marketVal = curPrice * invTotalShares;
-        const sellFee = calcFee(marketVal, invDiscount);
+        const sellFee = calcFee(marketVal, invSellFullFee ? 1 : invDiscount);
         const sellTax = Math.floor(marketVal * taxRate);
         netProfit = Math.round(marketVal - sellFee - sellTax - invTotalBuyCost);
         roi = ((netProfit / invTotalBuyCost) * 100).toFixed(2);
@@ -2298,7 +2314,7 @@
               <input type="number" class="order-input" placeholder="現價" value="${curPriceVal}" step="any" min="0.01" inputmode="decimal" style="background:#1c1c1e; border:1px solid var(--border); border-radius:6px; padding:4px; font-size:0.85rem; font-weight:700; text-align:left; width:100%; margin-top:2px;" oninput="updateInvCurrentPrice(${invIdx}, this.value)">
             </div>
             <div>
-              <div class="inv-stat-label">買進均價 / 股數</div>
+              <div class="inv-stat-label">持有均價 / 股數</div>
               <div class="inv-stat-val" id="inv-avg-${invIdx}">${res.avgBuyPrice > 0 ? `${res.avgBuyPrice.toFixed(2)} (${res.invTotalShares}股)` : '--'}</div>
             </div>
             <div>
