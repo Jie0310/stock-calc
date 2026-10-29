@@ -31,7 +31,7 @@
       -webkit-tap-highlight-color: transparent;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang TC", "Noto Sans TC", sans-serif;
       background-color: var(--bg);
       color: var(--text);
       margin: 0;
@@ -240,6 +240,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 6px;
     }
     .quote-stock-name {
       font-weight: 700;
@@ -295,10 +296,14 @@
     .order-clickable:active {
       opacity: 0.6;
     }
-    .five-bid-price { color: var(--profit); text-align: right; }
+    .five-bid-price { text-align: right; }
     .five-bid-vol { color: var(--text-muted); text-align: left; }
-    .five-ask-price { color: var(--loss); text-align: left; }
+    .five-ask-price { text-align: left; }
     .five-ask-vol { color: var(--text-muted); text-align: right; }
+
+    .price-up { color: var(--profit); }
+    .price-down { color: var(--loss); }
+    .price-flat { color: var(--text); }
 
     .input-row {
       display: flex;
@@ -458,6 +463,13 @@
       padding: 10px 12px;
       border-radius: 10px;
     }
+    .summary-box.wide {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
     .summary-title {
       font-size: 0.7rem;
       color: var(--text-muted);
@@ -467,6 +479,11 @@
       font-size: 1.05rem;
       font-weight: 700;
       color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-box.wide .summary-value {
+      font-size: 1.2rem;
+      text-align: right;
     }
     .highlight-val {
       color: var(--profit);
@@ -512,8 +529,16 @@
       background: rgba(10, 132, 255, 0.18);
       font-weight: 700;
     }
-    tr.open-row {
+    tr.flat-row {
       background: rgba(255, 255, 255, 0.15);
+      font-weight: 700;
+    }
+    tr.now-up-row {
+      background: rgba(255, 69, 58, 0.16);
+      font-weight: 700;
+    }
+    tr.now-down-row {
+      background: rgba(48, 209, 88, 0.16);
       font-weight: 700;
     }
     tr.limit-row {
@@ -524,6 +549,9 @@
       background: rgba(48, 209, 88, 0.22);
       font-weight: 700;
     }
+    tr.now-mark-up td:first-child { box-shadow: inset 3px 0 0 var(--profit); }
+    tr.now-mark-down td:first-child { box-shadow: inset 3px 0 0 var(--loss); }
+    tr.now-mark-flat td:first-child { box-shadow: inset 3px 0 0 #ffffff; }
     .text-center { text-align: center; }
     .profit-text { color: var(--profit); font-weight: 700; }
     .loss-text { color: var(--loss); font-weight: 700; }
@@ -612,7 +640,6 @@
       font-size: 0.75rem;
       font-weight: 700;
       color: var(--primary);
-      text-transform: uppercase;
       letter-spacing: 0.5px;
       margin: 14px 0 6px 0;
     }
@@ -695,7 +722,7 @@
           <span class="quote-stock-name" id="quoteStockName">--</span>
           <span id="quotePriceDiff" style="margin-left:6px; font-weight:700;">--</span>
         </div>
-        <div style="display:flex; align-items:center;">
+        <div style="display:flex; align-items:center; flex-shrink:0;">
           <div style="color:var(--text-muted); font-size:0.72rem; display:flex; align-items:center;" id="quoteTime">
             <span class="pulse-dot" id="liveDot" style="display:none;"></span>
             <span id="quoteTimeText">--:--</span>
@@ -707,8 +734,8 @@
 
       <div class="five-order-card" id="fiveOrderCard" style="display:none;">
         <div class="five-order-header">
-          <span>買進五檔 (委買)</span>
-          <span>委賣五檔 (賣出)</span>
+          <span>委買五檔</span>
+          <span>委賣五檔</span>
         </div>
         <table class="five-order-table">
           <tbody id="fiveOrderBody"></tbody>
@@ -800,7 +827,7 @@
 
       <div class="modal-section-title">即時行情自動更新</div>
       <div class="input-row">
-        <span class="input-label">開盤即時自動更新</span>
+        <span class="input-label">盤中自動更新 (8:30–13:35)</span>
         <input type="checkbox" id="autoRefreshToggle" class="custom-checkbox" checked onchange="handleAutoRefreshToggle()">
       </div>
       <div class="input-row">
@@ -810,9 +837,9 @@
       <div class="input-row">
         <span class="input-label">更新頻率</span>
         <select id="refreshIntervalSelect" class="input-control" onchange="handleIntervalChange(this.value)">
-          <option value="1000">每 1 秒 (極速)</option>
+          <option value="1000">每 1 秒</option>
           <option value="3000">每 3 秒</option>
-          <option value="5000" selected>每 5 秒 (穩定推薦)</option>
+          <option value="5000" selected>每 5 秒 (推薦)</option>
           <option value="10000">每 10 秒</option>
           <option value="30000">每 30 秒</option>
         </select>
@@ -820,7 +847,7 @@
 
       <div class="modal-section-title">手續費與交易規則</div>
       <div class="input-row">
-        <span class="input-label">手續費折讓</span>
+        <span class="input-label">計算頁折讓</span>
         <select id="discountSelect" class="input-control" onchange="handleDiscountPresetChange(this.value)">
           <option value="0.2">2 折 (0.20)</option>
           <option value="0.25" selected>2.5 折 (0.25)</option>
@@ -834,10 +861,29 @@
           <option value="custom">自訂數值</option>
         </select>
       </div>
-
       <div class="input-row" id="customDiscountRow" style="display:none;">
         <span class="input-label">自訂折讓比率</span>
         <input type="number" id="customDiscountInput" class="input-control" placeholder="例如 0.18" step="0.01" min="0.01" max="1" inputmode="decimal">
+      </div>
+
+      <div class="input-row">
+        <span class="input-label">庫存帳戶折讓</span>
+        <select id="invDiscountSelect" class="input-control" onchange="handleInvDiscountPresetChange(this.value)">
+          <option value="0.2">2 折 (0.20)</option>
+          <option value="0.25" selected>2.5 折 (0.25)</option>
+          <option value="0.28">2.8 折 (0.28)</option>
+          <option value="0.3">3 折 (0.30)</option>
+          <option value="0.38">3.8 折 (0.38)</option>
+          <option value="0.4">4 折 (0.40)</option>
+          <option value="0.5">5 折 (0.50)</option>
+          <option value="0.6">6 折 (0.60)</option>
+          <option value="1.0">無打折 (1.00)</option>
+          <option value="custom">自訂數值</option>
+        </select>
+      </div>
+      <div class="input-row" id="invCustomDiscountRow" style="display:none;">
+        <span class="input-label">庫存自訂折讓</span>
+        <input type="number" id="invCustomDiscountInput" class="input-control" placeholder="例如 0.18" step="0.01" min="0.01" max="1" inputmode="decimal">
       </div>
 
       <div class="input-row">
@@ -849,6 +895,10 @@
       </div>
 
       <div class="modal-section-title">摘要資訊卡顯示開關</div>
+      <div class="input-row">
+        <span class="input-label">現價損益</span>
+        <input type="checkbox" id="showSummaryNow" class="custom-checkbox" checked onchange="handleDisplayToggle()">
+      </div>
       <div class="input-row">
         <span class="input-label">保本出場所需</span>
         <input type="checkbox" id="showSummaryBreakeven" class="custom-checkbox" checked onchange="handleDisplayToggle()">
@@ -862,7 +912,7 @@
         <input type="checkbox" id="showSummaryTick" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
       <div class="input-row">
-        <span class="input-label">跌停賠多少 / 模式與稅率</span>
+        <span class="input-label">跌停賠多少 / 折讓與稅率</span>
         <input type="checkbox" id="showSummaryRate" class="custom-checkbox" checked onchange="handleDisplayToggle()">
       </div>
 
@@ -890,21 +940,27 @@
 
   <script>
     const STORAGE_KEY = 'taiwan_stock_calc_v43_data';
+    const WORKER_URL = 'https://twse-proxy.yijhuang8931.workers.dev';
+    const FEE_RATE = 0.001425;
 
     let currentMode = 'daytrade';
     let currentTab = 0;
     let minFeeLimit = 20;
-    let currentDiscount = 0.25;
+    let currentDiscount = 0.25;   // 計算頁（當沖 / 波段 / 權證）
+    let invDiscount = 0.25;       // 庫存帳戶
     let autoRefresh = true;
     let showFiveOrder = true;
     let refreshInterval = 5000;
     let refreshTimer = null;
     let isFetching = false;
     let lastFetchTime = 0;
+    let lastInvSyncTime = 0;
+    let isSyncingInv = false;
 
     let enabledTabs = [true, true, true];
 
     let displayConfig = {
+      summaryNow: true,
       summaryBreakeven: true,
       summaryTotal: true,
       summaryTick: true,
@@ -925,6 +981,60 @@
     let tabsData = JSON.parse(JSON.stringify(defaultTabsData));
     let inventoryData = JSON.parse(JSON.stringify(defaultInventory));
 
+    // ================= 共用工具 =================
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function samePrice(a, b) {
+      return a !== null && b !== null && a !== undefined && b !== undefined && Math.abs(a - b) < 0.0001;
+    }
+
+    function signed(n) {
+      return (n > 0 ? '+' : '') + n.toLocaleString();
+    }
+
+    function pnlClass(n) {
+      return n > 0 ? 'profit-text' : (n < 0 ? 'loss-text' : '');
+    }
+
+    // 以平盤價（昨收）為準：高於平盤紅、低於平盤綠、等於平盤白
+    function priceClass(p, ref) {
+      if (!ref || !p) return '';
+      if (p > ref + 0.0001) return 'price-up';
+      if (p < ref - 0.0001) return 'price-down';
+      return 'price-flat';
+    }
+
+    function calcFee(amt, discount) {
+      return Math.max(minFeeLimit, Math.floor(amt * FEE_RATE * discount));
+    }
+
+    function isETF(symbol) {
+      return /^00/.test((symbol || '').toUpperCase());
+    }
+
+    function getTickKind(data) {
+      if (data.mode === 'warrant') return 'warrant';
+      if (isETF(data.symbol)) return 'etf';
+      return 'stock';
+    }
+
+    function getTaxRate(mode, symbol) {
+      if (mode === 'warrant') return 0.001;
+      if (isETF(symbol)) return 0.001;     // ETF 證交稅 0.1%（當沖也一樣）
+      if (mode === 'daytrade') return 0.0015;
+      return 0.003;
+    }
+
+    function isMarketOpen() {
+      const tw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+      const day = tw.getDay();
+      const mins = tw.getHours() * 60 + tw.getMinutes();
+      return day >= 1 && day <= 5 && mins >= 8 * 60 + 30 && mins <= 13 * 60 + 35;
+    }
+
     function startLiveClock() {
       const clockEl = document.getElementById('clockBadge');
       const updateClock = () => {
@@ -936,37 +1046,43 @@
       setInterval(updateClock, 1000);
     }
 
+    // ================= 存檔 / 讀檔 =================
+
     function loadState() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed.tabsData) tabsData = parsed.tabsData;
-          if (parsed.inventoryData) inventoryData = parsed.inventoryData;
-          if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
-          if (parsed.currentMode !== undefined && parsed.currentMode !== 'market' && parsed.currentMode !== 'futures') {
-            currentMode = parsed.currentMode;
-          } else {
-            currentMode = 'daytrade';
+
+          if (Array.isArray(parsed.tabsData)) {
+            tabsData = defaultTabsData.map((d, i) =>
+              Object.assign(JSON.parse(JSON.stringify(d)), parsed.tabsData[i] || {})
+            );
           }
-          if (parsed.enabledTabs) enabledTabs = parsed.enabledTabs;
+          tabsData.forEach(t => {
+            if (!Array.isArray(t.orders) || t.orders.length === 0) t.orders = [{ price: null, qty: 1 }];
+            // 舊版報價格式（假五檔、開盤價用昨收頂替）直接丟掉，開啟後重新抓
+            if (t.quote && !t.quote.source) t.quote = null;
+          });
+
+          if (Array.isArray(parsed.inventoryData)) inventoryData = parsed.inventoryData;
+          if (parsed.currentTab !== undefined) currentTab = parsed.currentTab;
+          if (['daytrade', 'swing', 'warrant', 'inventory'].includes(parsed.currentMode)) {
+            currentMode = parsed.currentMode;
+          }
+          if (Array.isArray(parsed.enabledTabs)) enabledTabs = parsed.enabledTabs;
+          if (!enabledTabs.some(Boolean)) enabledTabs = [true, true, true];
+          if (!enabledTabs[currentTab]) currentTab = enabledTabs.findIndex(Boolean);
+
           if (parsed.tickRange) document.getElementById('tickRange').value = parsed.tickRange;
           if (parsed.minFee !== undefined) {
             minFeeLimit = parseInt(parsed.minFee, 10);
             document.getElementById('minFeeSelect').value = minFeeLimit;
           }
-          if (parsed.discount !== undefined) {
-            currentDiscount = parseFloat(parsed.discount);
-            applyDiscountToUI(currentDiscount);
-          }
-          if (parsed.autoRefresh !== undefined) {
-            autoRefresh = parsed.autoRefresh;
-            document.getElementById('autoRefreshToggle').checked = autoRefresh;
-          }
-          if (parsed.showFiveOrder !== undefined) {
-            showFiveOrder = parsed.showFiveOrder;
-            document.getElementById('showFiveOrderToggle').checked = showFiveOrder;
-          }
+          if (parsed.discount !== undefined) currentDiscount = parseFloat(parsed.discount);
+          if (parsed.invDiscount !== undefined) invDiscount = parseFloat(parsed.invDiscount);
+          if (parsed.autoRefresh !== undefined) autoRefresh = parsed.autoRefresh;
+          if (parsed.showFiveOrder !== undefined) showFiveOrder = parsed.showFiveOrder;
           if (parsed.refreshInterval !== undefined) {
             refreshInterval = parseInt(parsed.refreshInterval, 10);
             document.getElementById('refreshIntervalSelect').value = refreshInterval;
@@ -978,10 +1094,39 @@
       } catch (e) {
         console.error(e);
       }
+      applyDiscountToUI(currentDiscount, 'discountSelect', 'customDiscountRow', 'customDiscountInput');
+      applyDiscountToUI(invDiscount, 'invDiscountSelect', 'invCustomDiscountRow', 'invCustomDiscountInput');
+      document.getElementById('autoRefreshToggle').checked = autoRefresh;
       syncDisplayTogglesUI();
     }
 
+    function saveState() {
+      try {
+        const payload = {
+          tabsData,
+          inventoryData,
+          currentTab,
+          currentMode,
+          enabledTabs,
+          discount: currentDiscount,
+          invDiscount,
+          tickRange: document.getElementById('tickRange').value,
+          minFee: minFeeLimit,
+          autoRefresh,
+          showFiveOrder,
+          refreshInterval,
+          displayConfig
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // ================= 設定 =================
+
     function syncDisplayTogglesUI() {
+      document.getElementById('showSummaryNow').checked = displayConfig.summaryNow;
       document.getElementById('showSummaryBreakeven').checked = displayConfig.summaryBreakeven;
       document.getElementById('showSummaryTotal').checked = displayConfig.summaryTotal;
       document.getElementById('showSummaryTick').checked = displayConfig.summaryTick;
@@ -998,9 +1143,9 @@
     }
 
     function updateTabSettingLabels() {
-      document.getElementById('tabSettingLabel0').innerText = `啟用 ${tabsData[0].name || '標的 1'}`;
-      document.getElementById('tabSettingLabel1').innerText = `啟用 ${tabsData[1].name || '標的 2'}`;
-      document.getElementById('tabSettingLabel2').innerText = `啟用 ${tabsData[2].name || '標的 3'}`;
+      for (let i = 0; i < 3; i++) {
+        document.getElementById(`tabSettingLabel${i}`).innerText = `啟用 ${tabsData[i].name || `標的 ${i + 1}`}`;
+      }
     }
 
     function handleTabVisibilityChange(idx) {
@@ -1013,37 +1158,16 @@
       }
 
       enabledTabs[idx] = isChecked;
-
       if (!enabledTabs[currentTab]) {
-        currentTab = enabledTabs.findIndex(t => t);
+        handleTabClick(enabledTabs.findIndex(t => t));
+        return;
       }
-
       saveState();
       renderTabs();
-      syncUIFromCurrentTab();
-    }
-
-    function renderTabs() {
-      const tabBar = document.getElementById('calcTabBar');
-      tabBar.innerHTML = '';
-
-      tabsData.forEach((t, i) => {
-        if (enabledTabs[i]) {
-          const tabItem = document.createElement('div');
-          tabItem.className = `tab-item ${i === currentTab ? 'active' : ''}`;
-          tabItem.dataset.tab = i;
-          tabItem.onclick = () => handleTabClick(i);
-          tabItem.innerHTML = `
-            <span id="tabName${i}">${t.name || `標的 ${i + 1}`}</span>
-            <span class="tab-edit-icon" onclick="renameTab(event, ${i})">✎</span>
-          `;
-          tabBar.appendChild(tabItem);
-        }
-      });
-      tabBar.style.display = (currentMode === 'inventory') ? 'none' : 'flex';
     }
 
     function handleDisplayToggle() {
+      displayConfig.summaryNow = document.getElementById('showSummaryNow').checked;
       displayConfig.summaryBreakeven = document.getElementById('showSummaryBreakeven').checked;
       displayConfig.summaryTotal = document.getElementById('showSummaryTotal').checked;
       displayConfig.summaryTick = document.getElementById('showSummaryTick').checked;
@@ -1059,6 +1183,7 @@
       autoRefresh = document.getElementById('autoRefreshToggle').checked;
       saveState();
       restartAutoRefresh();
+      if (currentMode !== 'inventory') renderQuoteBanner(tabsData[currentTab].quote);
     }
 
     function handleFiveOrderToggle() {
@@ -1073,14 +1198,13 @@
       restartAutoRefresh();
     }
 
-    function applyDiscountToUI(val) {
-      const select = document.getElementById('discountSelect');
-      const customRow = document.getElementById('customDiscountRow');
-      const customInput = document.getElementById('customDiscountInput');
-      
-      const matched = Array.from(select.options).some(opt => opt.value !== 'custom' && parseFloat(opt.value) === val);
+    function applyDiscountToUI(val, selectId, rowId, inputId) {
+      const select = document.getElementById(selectId);
+      const customRow = document.getElementById(rowId);
+      const customInput = document.getElementById(inputId);
+      const matched = Array.from(select.options).find(opt => opt.value !== 'custom' && parseFloat(opt.value) === val);
       if (matched) {
-        select.value = val.toString();
+        select.value = matched.value;
         customRow.style.display = 'none';
       } else {
         select.value = 'custom';
@@ -1101,8 +1225,22 @@
         currentDiscount = parseFloat(val);
       }
       saveState();
+      if (currentMode !== 'inventory') renderTable();
+    }
+
+    function handleInvDiscountPresetChange(val) {
+      const customRow = document.getElementById('invCustomDiscountRow');
+      const customInput = document.getElementById('invCustomDiscountInput');
+      if (val === 'custom') {
+        customRow.style.display = 'flex';
+        if (!customInput.value) customInput.value = invDiscount;
+        invDiscount = parseFloat(customInput.value) || 0.25;
+      } else {
+        customRow.style.display = 'none';
+        invDiscount = parseFloat(val);
+      }
+      saveState();
       if (currentMode === 'inventory') renderInventoryList();
-      else renderTable();
     }
 
     document.getElementById('customDiscountInput').addEventListener('input', (e) => {
@@ -1110,39 +1248,51 @@
       if (!isNaN(val) && val > 0) {
         currentDiscount = val;
         saveState();
-        if (currentMode === 'inventory') recalculateInventorySummary();
-        else renderTable();
+        if (currentMode !== 'inventory') renderTable();
       }
     });
 
-    function saveState() {
-      try {
-        const payload = {
-          tabsData: tabsData,
-          inventoryData: inventoryData,
-          currentTab: currentTab,
-          currentMode: currentMode,
-          enabledTabs: enabledTabs,
-          discount: currentDiscount,
-          tickRange: document.getElementById('tickRange').value,
-          minFee: minFeeLimit,
-          autoRefresh: autoRefresh,
-          showFiveOrder: showFiveOrder,
-          refreshInterval: refreshInterval,
-          displayConfig: displayConfig
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      } catch (e) {
-        console.error(e);
+    document.getElementById('invCustomDiscountInput').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val > 0) {
+        invDiscount = val;
+        saveState();
+        if (currentMode === 'inventory') renderInventoryList();
       }
+    });
+
+    // ================= 分頁 / 模式 =================
+
+    function renderTabs() {
+      const tabBar = document.getElementById('calcTabBar');
+      tabBar.innerHTML = '';
+
+      tabsData.forEach((t, i) => {
+        if (enabledTabs[i]) {
+          const tabItem = document.createElement('div');
+          tabItem.className = `tab-item ${i === currentTab ? 'active' : ''}`;
+          tabItem.dataset.tab = i;
+          tabItem.onclick = () => handleTabClick(i);
+          tabItem.innerHTML = `
+            <span id="tabName${i}">${escapeHtml(t.name || `標的 ${i + 1}`)}</span>
+            <span class="tab-edit-icon" onclick="renameTab(event, ${i})">✎</span>
+          `;
+          tabBar.appendChild(tabItem);
+        }
+      });
+      tabBar.style.display = (currentMode === 'inventory') ? 'none' : 'flex';
     }
 
     function handleTabClick(index) {
       currentTab = index;
-      renderTabs();
+      if (currentMode !== 'inventory') {
+        currentMode = tabsData[index].mode || 'daytrade';   // 模式按鈕跟著分頁走
+      }
+      clearDiag();
       syncUIFromCurrentTab();
       saveState();
       restartAutoRefresh();
+      if (currentMode !== 'inventory' && tabsData[index].symbol) fetchLiveQuote(false);
     }
 
     function renameTab(e, index) {
@@ -1216,6 +1366,8 @@
       }
       syncUIFromCurrentTab();
       saveState();
+      restartAutoRefresh();
+      if (mode === 'inventory' && Date.now() - lastInvSyncTime > 30000) syncAllInventory();
     }
 
     function setDirection(dir) {
@@ -1254,7 +1406,20 @@
       document.getElementById('thPriceLabel').innerText = isShort ? '回補價格' : '賣出價格';
     }
 
-    function getTickSize(price) {
+    // ================= 升降單位 =================
+
+    function getTickSize(price, kind = 'stock') {
+      if (kind === 'etf') {
+        return price < 50 ? 0.01 : 0.05;
+      }
+      if (kind === 'warrant') {
+        if (price < 5) return 0.01;
+        if (price < 10) return 0.05;
+        if (price < 50) return 0.10;
+        if (price < 100) return 0.50;
+        if (price < 500) return 1.00;
+        return 5.00;
+      }
       if (price < 10) return 0.01;
       if (price < 50) return 0.05;
       if (price < 100) return 0.10;
@@ -1263,20 +1428,20 @@
       return 5.00;
     }
 
-    function stepTick(price, direction) {
+    function stepTick(price, direction, kind = 'stock') {
       let p = Number(price);
       if (direction > 0) {
-        let tick = getTickSize(p);
+        let tick = getTickSize(p, kind);
         let aligned = Math.floor(Math.round(p * 100) / Math.round(tick * 100)) * tick;
         let nextP = Math.round((aligned + tick) * 100) / 100;
         if (nextP <= p + 0.0001) {
-          tick = getTickSize(nextP);
+          tick = getTickSize(nextP, kind);
           nextP = Math.round((nextP + tick) * 100) / 100;
         }
         return nextP;
       } else {
         let testP = p - 0.0001;
-        let tick = getTickSize(testP);
+        let tick = getTickSize(testP, kind);
         let aligned = Math.floor(Math.round(p * 100) / Math.round(tick * 100)) * tick;
         let nextP = aligned;
         if (nextP >= p - 0.0001) {
@@ -1286,26 +1451,43 @@
       }
     }
 
+    // 沒有官方漲跌停價時的備援：以昨收 ±10% 往內取到合法檔位
+    function getLimitPrice(ref, direction, kind = 'stock') {
+      const target = direction > 0 ? ref * 1.10 : ref * 0.90;
+      let p = ref;
+      for (let i = 0; i < 1000; i++) {
+        const next = stepTick(p, direction, kind);
+        if (direction > 0 ? next > target + 0.0001 : next < target - 0.0001) break;
+        p = next;
+      }
+      return p;
+    }
+
+    // ================= 下單明細 =================
+
     function stepPrice(idx, direction) {
       const data = tabsData[currentTab];
       let cur = data.orders[idx].price;
       if (cur === null || cur === undefined || isNaN(cur) || cur <= 0) {
-        cur = (data.quote && data.quote.currentPrice > 0) ? data.quote.currentPrice : ((data.quote && data.quote.openPrice > 0) ? data.quote.openPrice : 100);
+        cur = (data.quote && data.quote.currentPrice > 0) ? data.quote.currentPrice
+          : ((data.quote && data.quote.prevClose > 0) ? data.quote.prevClose : 100);
+        data.orders[idx].price = cur;     // 第一次按先帶入現價
+      } else {
+        data.orders[idx].price = stepTick(cur, direction, getTickKind(data));
       }
-      const next = stepTick(cur, direction);
-      data.orders[idx].price = next;
       renderOrderRows();
       renderTable();
       saveState();
     }
 
     function stepQty(idx, direction) {
-      const isOdd = tabsData[currentTab].unit === 'odd' && tabsData[currentTab].mode === 'swing';
+      const data = tabsData[currentTab];
+      const isOdd = data.unit === 'odd' && data.mode === 'swing';
       const step = isOdd ? 100 : 1;
-      let cur = tabsData[currentTab].orders[idx].qty || (isOdd ? 100 : 1);
-      let next = cur + (direction * step);
-      if (next <= 0) next = isOdd ? 10 : 0.1;
-      tabsData[currentTab].orders[idx].qty = Math.round(next * 1000) / 1000;
+      const cur = data.orders[idx].qty || (isOdd ? 100 : 1);
+      let next = cur + direction * step;
+      if (next < 1) next = 1;
+      data.orders[idx].qty = Math.round(next);
       renderOrderRows();
       renderTable();
       saveState();
@@ -1331,13 +1513,13 @@
           
           <div class="stepper-group">
             <button class="stepper-btn" type="button" onclick="stepPrice(${idx}, -1)">−</button>
-            <input type="number" class="order-input" placeholder="價格" value="${priceVal}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
+            <input type="number" class="order-input" placeholder="入場價" value="${priceVal}" step="any" min="0.01" inputmode="decimal" oninput="updateOrder(${idx}, 'price', this.value)">
             <button class="stepper-btn" type="button" onclick="stepPrice(${idx}, 1)">+</button>
           </div>
 
           <div class="stepper-group">
             <button class="stepper-btn" type="button" onclick="stepQty(${idx}, -1)">−</button>
-            <input type="number" class="order-input" placeholder="${qtyLabel}" value="${qtyVal}" step="${qtyStep}" min="${isOdd ? 1 : 0.001}" inputmode="${isOdd ? 'numeric' : 'decimal'}" oninput="updateOrder(${idx}, 'qty', this.value)">
+            <input type="number" class="order-input" placeholder="${qtyLabel}" value="${qtyVal}" step="${qtyStep}" min="1" inputmode="${isOdd ? 'numeric' : 'decimal'}" oninput="updateOrder(${idx}, 'qty', this.value)">
             <button class="stepper-btn" type="button" onclick="stepQty(${idx}, 1)">+</button>
           </div>
 
@@ -1351,10 +1533,8 @@
       const data = tabsData[currentTab];
       const livePrice = (data.quote && data.quote.currentPrice > 0) ? data.quote.currentPrice : null;
       const last = data.orders[data.orders.length - 1] || { price: null, qty: data.unit === 'odd' ? 1000 : 1 };
-      
       const newPrice = livePrice !== null ? livePrice : last.price;
       data.orders.push({ price: newPrice, qty: last.qty });
-      
       renderOrderRows();
       renderTable();
       saveState();
@@ -1379,202 +1559,172 @@
       saveState();
     }
 
-    function getLimitPrice(ref, direction) {
-      let target = direction > 0 ? ref * 1.10 : ref * 0.90;
-      let p = ref;
-      if (direction > 0) {
-        while (true) {
-          let next = stepTick(p, 1);
-          if (next > target + 0.0001) break;
-          p = next;
-        }
-      } else {
-        while (true) {
-          let next = stepTick(p, -1);
-          if (next < target - 0.0001) break;
-          p = next;
-        }
-      }
-      return p;
-    }
+    // ================= 損益計算 =================
 
     function calculateTrade(baseP, targetP, shares, discount, taxRate, isShort) {
-      let sellPrice = isShort ? baseP : targetP;
-      let buyPrice = isShort ? targetP : baseP;
+      const sellPrice = isShort ? baseP : targetP;
+      const buyPrice = isShort ? targetP : baseP;
 
       const buyAmt = buyPrice * shares;
       const sellAmt = sellPrice * shares;
-      const buyFee = Math.max(minFeeLimit, Math.floor(buyAmt * 0.001425 * discount));
-      const sellFee = Math.max(minFeeLimit, Math.floor(sellAmt * 0.001425 * discount));
+      const buyFee = calcFee(buyAmt, discount);
+      const sellFee = calcFee(sellAmt, discount);
       const tax = Math.floor(sellAmt * taxRate);
       const totalCost = buyFee + sellFee + tax;
-      const netProfit = sellAmt - buyAmt - totalCost;
+      const netProfit = Math.round(sellAmt - buyAmt - totalCost);
 
-      const capitalBase = isShort ? (sellAmt + sellFee + tax) : (buyAmt + buyFee);
-      const roi = ((netProfit / capitalBase) * 100).toFixed(2);
+      const capitalBase = isShort ? sellAmt : (buyAmt + buyFee);
+      const roi = capitalBase > 0 ? ((netProfit / capitalBase) * 100).toFixed(2) : '0.00';
 
       return { buyAmt, sellAmt, buyFee, sellFee, tax, totalCost, netProfit, roi };
     }
 
-    function getTaxRate(mode) {
-      if (mode === 'warrant') return 0.001;
-      if (mode === 'daytrade') return 0.0015;
-      return 0.003;
+    function summaryBox(title, value, valueClass = '', wide = false) {
+      return `
+        <div class="summary-box${wide ? ' wide' : ''}">
+          <div class="summary-title">${title}</div>
+          <div class="summary-value ${valueClass}">${value}</div>
+        </div>
+      `;
     }
 
     function renderTable() {
       const data = tabsData[currentTab];
+      const q = data.quote;
+      const kind = getTickKind(data);
       const isShort = data.mode === 'daytrade' && data.direction === 'sell';
       const isOdd = data.unit === 'odd' && data.mode === 'swing';
       const discount = currentDiscount;
-      const taxRate = getTaxRate(data.mode);
+      const taxRate = getTaxRate(data.mode, data.symbol);
 
-      const hasLiveQuote = !!(data.quote && (data.quote.openPrice > 0 || data.quote.prevClose > 0));
-      const baseStockPrice = hasLiveQuote ? (data.quote.openPrice || data.quote.prevClose) : null;
-      const actualOpenPrice = (hasLiveQuote && data.quote.openPrice > 0) ? data.quote.openPrice : null;
-
-      document.getElementById('tickRangeRow').style.display = hasLiveQuote ? 'none' : 'flex';
+      const hasLiveQuote = !!(q && q.prevClose > 0);
+      const flatPrice = hasLiveQuote ? q.prevClose : null;                         // 平盤 = 昨收
+      const nowPrice = (hasLiveQuote && q.currentPrice > 0) ? q.currentPrice : null; // 現價
+      const openPrice = (hasLiveQuote && q.openPrice > 0) ? q.openPrice : null;      // 真實開盤價（未開盤為 null）
 
       document.getElementById('thCost').style.display = displayConfig.colCost ? '' : 'none';
       document.getElementById('thProfit').style.display = displayConfig.colProfit ? '' : 'none';
       document.getElementById('thRoi').style.display = displayConfig.colRoi ? '' : 'none';
 
-      let totalVal = 0;
-      let totalQty = 0;
-      let hasValidOrderPrice = false;
-
-      data.orders.forEach(item => {
-        if (item.price !== null && item.price !== undefined && item.price > 0 && item.qty > 0) {
-          totalVal += item.price * item.qty;
-          totalQty += item.qty;
-          hasValidOrderPrice = true;
-        } else if (item.qty > 0) {
-          totalQty += item.qty;
-        }
-      });
-
-      let calcPrice = null;
-      if (hasValidOrderPrice && totalVal > 0) {
-        calcPrice = totalVal / (data.orders.filter(o => o.price > 0).reduce((sum, o) => sum + o.qty, 0) || 1);
-      } else if (hasLiveQuote) {
-        calcPrice = baseStockPrice;
-      }
-
+      // 有填入場價：只計算有價格的筆數；沒填：以平盤價試算，張數照填的算
+      const priced = data.orders.filter(o => o.price > 0 && o.qty > 0);
+      const hasEntry = priced.length > 0;
+      const qtyOrders = hasEntry ? priced : data.orders.filter(o => o.qty > 0);
+      const totalQty = qtyOrders.reduce((s, o) => s + o.qty, 0);
       const totalShares = isOdd ? Math.round(totalQty || 1000) : Math.round((totalQty || 1) * 1000);
 
-      if (hasValidOrderPrice) {
-        document.getElementById('avgDisplay').innerText = data.orders.length > 1 
-          ? `均價 ${calcPrice.toFixed(2)} 元 (${isOdd ? totalShares + '股' : totalQty + '張'})` 
-          : `${isOdd ? totalShares + ' 股' : totalQty + ' 張 (' + totalShares + '股)'}`;
+      let calcPrice = null;
+      if (hasEntry) {
+        calcPrice = priced.reduce((s, o) => s + o.price * o.qty, 0) / totalQty;
+      } else if (hasLiveQuote) {
+        calcPrice = flatPrice;
+      }
+
+      const qtyText = isOdd ? `${totalShares} 股` : `${totalQty || 1} 張`;
+      const avgEl = document.getElementById('avgDisplay');
+      if (hasEntry) {
+        avgEl.innerText = priced.length > 1 ? `均價 ${calcPrice.toFixed(2)} 元 (${qtyText})` : qtyText;
+      } else if (hasLiveQuote) {
+        avgEl.innerText = `以平盤 ${flatPrice.toFixed(2)} 試算 (${qtyText})`;
       } else {
-        document.getElementById('avgDisplay').innerText = '';
+        avgEl.innerText = '';
       }
 
       const tbody = document.getElementById('tickTableBody');
+      const summaryGrid = document.getElementById('summaryGrid');
 
       if (!calcPrice || calcPrice <= 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding: 24px 0;">請輸入股票代號同步行情，或填入下單價格以計算檔位</td></tr>`;
-        document.getElementById('summaryGrid').style.display = 'none';
+        document.getElementById('tickRangeRow').style.display = 'flex';
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center muted-text" style="padding: 24px 0;">請輸入股票代號同步行情，或填入入場價格以計算檔位</td></tr>`;
+        summaryGrid.style.display = 'none';
         return;
       }
 
-      let upPrices = [];
-      let downPrices = [];
-      let upLimit = 0;
-      let downLimit = 0;
+      // 漲跌停：優先用證交所官方價，沒有才以昨收自己算（權證無法自算）
+      let upLimit = null;
+      let downLimit = null;
+      if (hasLiveQuote) {
+        upLimit = q.limitUp || (kind === 'warrant' ? null : getLimitPrice(flatPrice, 1, kind));
+        downLimit = q.limitDown || (kind === 'warrant' ? null : getLimitPrice(flatPrice, -1, kind));
+      }
+      const useLimits = !!(upLimit && downLimit);
+      document.getElementById('tickRangeRow').style.display = useLimits ? 'none' : 'flex';
 
-      if (hasLiveQuote && baseStockPrice > 0) {
-        upLimit = getLimitPrice(baseStockPrice, 1);
-        downLimit = getLimitPrice(baseStockPrice, -1);
-
-        let curUp = calcPrice;
-        let upCount = 0;
-        while (curUp < upLimit && upCount < 400) {
-          curUp = stepTick(curUp, 1);
-          upCount++;
-          const isOpen = actualOpenPrice !== null && Math.abs(curUp - actualOpenPrice) < 0.0001;
-          upPrices.push({ tickOffset: `+${upCount}`, price: curUp, isLimitUp: curUp >= upLimit, isOpen: isOpen });
+      const upPrices = [];
+      const downPrices = [];
+      if (useLimits) {
+        let cur = calcPrice, n = 0;
+        while (cur < upLimit - 0.0001 && n < 400) {
+          cur = stepTick(cur, 1, kind);
+          n++;
+          upPrices.push({ label: `+${n}`, price: cur });
         }
-
-        let curDown = calcPrice;
-        let downCount = 0;
-        while (curDown > downLimit && downCount < 400) {
-          curDown = stepTick(curDown, -1);
-          downCount++;
-          const isOpen = actualOpenPrice !== null && Math.abs(curDown - actualOpenPrice) < 0.0001;
-          downPrices.push({ tickOffset: `-${downCount}`, price: curDown, isLimitDown: curDown <= downLimit, isOpen: isOpen });
+        cur = calcPrice; n = 0;
+        while (cur > downLimit + 0.0001 && n < 400) {
+          cur = stepTick(cur, -1, kind);
+          n++;
+          downPrices.push({ label: `-${n}`, price: cur });
         }
       } else {
         const numTicks = parseInt(document.getElementById('tickRange').value, 10);
-        let curUp = calcPrice;
+        let cur = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
-          curUp = stepTick(curUp, 1);
-          upPrices.push({ tickOffset: `+${i}`, price: curUp, isOpen: false });
+          cur = stepTick(cur, 1, kind);
+          upPrices.push({ label: `+${i}`, price: cur });
         }
-
-        let curDown = calcPrice;
+        cur = calcPrice;
         for (let i = 1; i <= numTicks; i++) {
-          curDown = stepTick(curDown, -1);
-          downPrices.push({ tickOffset: `-${i}`, price: curDown });
+          cur = stepTick(cur, -1, kind);
+          downPrices.push({ label: `-${i}`, price: cur });
         }
       }
 
-      let baseLabel = '';
-      const isBaseOpen = actualOpenPrice !== null && Math.abs(calcPrice - actualOpenPrice) < 0.0001;
-      if (hasValidOrderPrice) {
-        baseLabel = data.orders.length > 1 ? '均價' : (isShort ? '先賣' : '買進');
-        if (isBaseOpen) baseLabel += ' (開盤)';
-      } else {
-        baseLabel = '開盤';
-      }
-
+      const baseLabel = hasEntry ? (priced.length > 1 ? '均價' : (isShort ? '先賣' : '買進')) : '平盤';
       const list = [
         ...upPrices.reverse(),
-        { tickOffset: baseLabel, price: calcPrice, isBaseRow: true, isOpen: isBaseOpen },
+        { label: baseLabel, price: calcPrice, isBaseRow: true },
         ...downPrices
       ];
 
       tbody.innerHTML = '';
-      let breakEvenTick = null;
 
       list.forEach(item => {
         const res = calculateTrade(calcPrice, item.price, totalShares, discount, taxRate, isShort);
+        const isFlat = samePrice(item.price, flatPrice);
+        const isNow = samePrice(item.price, nowPrice);
+        const isOpen = samePrice(item.price, openPrice);
+        const isLimitUp = useLimits && samePrice(item.price, upLimit);
+        const isLimitDown = useLimits && samePrice(item.price, downLimit);
+        const nowDir = isNow ? (nowPrice > flatPrice + 0.0001 ? 1 : (nowPrice < flatPrice - 0.0001 ? -1 : 0)) : 0;
+
+        const classes = [];
+        if (item.isBaseRow && hasEntry) classes.push('buy-row');
+        else if (isFlat) classes.push('flat-row');
+        else if (isNow) classes.push(nowDir > 0 ? 'now-up-row' : (nowDir < 0 ? 'now-down-row' : 'flat-row'));
+        else if (isLimitUp) classes.push('limit-row');
+        else if (isLimitDown) classes.push('limit-down-row');
+        if (isNow) classes.push(nowDir > 0 ? 'now-mark-up' : (nowDir < 0 ? 'now-mark-down' : 'now-mark-flat'));
+
         const tr = document.createElement('tr');
+        tr.className = classes.join(' ');
 
-        if (item.isBaseRow) {
-          tr.className = 'buy-row';
-        } else if (item.isOpen) {
-          tr.className = 'open-row';
-        } else if (item.isLimitUp) {
-          tr.className = 'limit-row';
-        } else if (item.isLimitDown) {
-          tr.className = 'limit-down-row';
-        }
+        const notes = [];
+        if (isFlat && !(item.isBaseRow && !hasEntry)) notes.push('平盤');
+        if (isNow) notes.push('現價');
+        if (isOpen) notes.push('開盤');
+        if (isLimitUp) notes.push('漲停');
+        if (isLimitDown) notes.push('跌停');
+        const tag = item.label + (notes.length ? ` (${notes.join('/')})` : '');
+        const highlighted = item.isBaseRow || isFlat || isNow || isOpen;
 
-        let profitClass = '';
-        let profitSign = '';
-        if (res.netProfit > 0) {
-          profitClass = 'profit-text';
-          profitSign = '+';
-          if (breakEvenTick === null && !item.isBaseRow) {
-            breakEvenTick = item.tickOffset;
-          }
-        } else if (res.netProfit < 0) {
-          profitClass = 'loss-text';
-        }
-
-        let tag = item.tickOffset;
-        if (item.isOpen && !item.isBaseRow) tag += ' (開盤)';
-        if (item.isLimitUp) tag += ' (漲停)';
-        if (item.isLimitDown) tag += ' (跌停)';
-
-        let costTd = displayConfig.colCost ? `<td class="muted-text">${res.totalCost.toLocaleString()}</td>` : '';
-        let profitTd = displayConfig.colProfit ? `<td class="${profitClass}">${profitSign}${res.netProfit.toLocaleString()}</td>` : '';
-        let roiTd = displayConfig.colRoi ? `<td class="${profitClass}">${profitSign}${res.roi}%</td>` : '';
+        const pc = pnlClass(res.netProfit);
+        const costTd = displayConfig.colCost ? `<td class="muted-text">${res.totalCost.toLocaleString()}</td>` : '';
+        const profitTd = displayConfig.colProfit ? `<td class="${pc}">${signed(res.netProfit)}</td>` : '';
+        const roiTd = displayConfig.colRoi ? `<td class="${pc}">${res.netProfit > 0 ? '+' : ''}${res.roi}%</td>` : '';
 
         tr.innerHTML = `
-          <td class="text-center ${item.isBaseRow || item.isOpen ? '' : 'muted-text'}">${tag}</td>
-          <td><strong>${item.price.toFixed(2)}</strong></td>
+          <td class="text-center ${highlighted ? '' : 'muted-text'}">${tag}</td>
+          <td><strong class="${priceClass(item.price, flatPrice)}">${item.price.toFixed(2)}</strong></td>
           ${costTd}
           ${profitTd}
           ${roiTd}
@@ -1582,12 +1732,11 @@
         tbody.appendChild(tr);
       });
 
-      let beText = breakEvenTick ? breakEvenTick.replace('+', '').replace('-', '') + ' 個 Tick' : '需更多檔位';
+      // 保本所需檔數
+      let beText = '需更多檔位';
       let searchP = calcPrice;
-      let count = 0;
-      while (count < 300) {
-        searchP = stepTick(searchP, isShort ? -1 : 1);
-        count++;
+      for (let count = 1; count <= 300; count++) {
+        searchP = stepTick(searchP, isShort ? -1 : 1, kind);
         const res = calculateTrade(calcPrice, searchP, totalShares, discount, taxRate, isShort);
         if (res.netProfit > 0) {
           beText = `${count} Tick (${searchP.toFixed(2)})`;
@@ -1595,85 +1744,63 @@
         }
       }
 
-      let upLimitProfitText = '--';
-      let downLimitLossText = '--';
-      if (hasLiveQuote && baseStockPrice > 0) {
-        const upRes = calculateTrade(calcPrice, upLimit, totalShares, discount, taxRate, isShort);
-        const downRes = calculateTrade(calcPrice, downLimit, totalShares, discount, taxRate, isShort);
-        upLimitProfitText = `+${upRes.netProfit.toLocaleString()} 元`;
-        downLimitLossText = `${downRes.netProfit.toLocaleString()} 元`;
-      }
-
+      // ===== 摘要 =====
       let summaryHtml = '';
 
+      if (displayConfig.summaryNow && nowPrice) {
+        const nowRes = calculateTrade(calcPrice, nowPrice, totalShares, discount, taxRate, isShort);
+        const basis = hasEntry ? '' : `<br>以平盤 ${flatPrice.toFixed(2)} ${isShort ? '先賣' : '買進'}試算`;
+        const title = `現價 <strong class="${priceClass(nowPrice, flatPrice)}" style="font-size:0.85rem;">${nowPrice.toFixed(2)}</strong> 損益${basis}`;
+        const cls = nowRes.netProfit > 0 ? 'highlight-val' : (nowRes.netProfit < 0 ? 'highlight-down' : '');
+        summaryHtml += summaryBox(title, `${signed(nowRes.netProfit)} 元<div style="font-size:0.75rem;">${nowRes.netProfit > 0 ? '+' : ''}${nowRes.roi}%</div>`, cls, true);
+      }
+
       if (displayConfig.summaryBreakeven) {
-        summaryHtml += `
-          <div class="summary-box">
-            <div class="summary-title">保本出場所需</div>
-            <div class="summary-value highlight-val">${beText}</div>
-          </div>
-        `;
+        summaryHtml += summaryBox('保本出場所需', beText, 'highlight-val');
       }
 
       if (displayConfig.summaryTotal) {
-        summaryHtml += `
-          <div class="summary-box">
-            <div class="summary-title">${isShort ? '賣出總額 (含規費)' : '買進總額 (含規費)'}</div>
-            <div class="summary-value">${Math.round(calcPrice * totalShares).toLocaleString()} 元</div>
-          </div>
-        `;
+        const amt = calcPrice * totalShares;
+        const fee = calcFee(amt, discount);
+        const total = isShort ? Math.round(amt - fee - Math.floor(amt * taxRate)) : Math.round(amt + fee);
+        summaryHtml += summaryBox(isShort ? '賣出淨收 (扣規費)' : '買進總額 (含手續費)', `${total.toLocaleString()} 元`);
       }
 
-      if (hasLiveQuote && baseStockPrice > 0) {
+      if (useLimits) {
         if (displayConfig.summaryTick) {
-          summaryHtml += `
-            <div class="summary-box">
-              <div class="summary-title">漲停賺多少 (+10%)</div>
-              <div class="summary-value highlight-val">${upLimitProfitText}</div>
-            </div>
-          `;
+          const upRes = calculateTrade(calcPrice, upLimit, totalShares, discount, taxRate, isShort);
+          summaryHtml += summaryBox(`漲停 ${upLimit.toFixed(2)}`, `${signed(upRes.netProfit)} 元`,
+            upRes.netProfit >= 0 ? 'highlight-val' : 'highlight-down');
         }
         if (displayConfig.summaryRate) {
-          summaryHtml += `
-            <div class="summary-box">
-              <div class="summary-title">跌停賠多少 (-10%)</div>
-              <div class="summary-value highlight-down">${downLimitLossText}</div>
-            </div>
-          `;
+          const downRes = calculateTrade(calcPrice, downLimit, totalShares, discount, taxRate, isShort);
+          summaryHtml += summaryBox(`跌停 ${downLimit.toFixed(2)}`, `${signed(downRes.netProfit)} 元`,
+            downRes.netProfit >= 0 ? 'highlight-val' : 'highlight-down');
         }
       } else {
         if (displayConfig.summaryTick) {
-          summaryHtml += `
-            <div class="summary-box">
-              <div class="summary-title">當前跳動單位</div>
-              <div class="summary-value">${getTickSize(calcPrice)} 元</div>
-            </div>
-          `;
+          summaryHtml += summaryBox('當前跳動單位', `${getTickSize(calcPrice, kind)} 元`);
         }
         if (displayConfig.summaryRate) {
-          summaryHtml += `
-            <div class="summary-box">
-              <div class="summary-title">折讓 / 稅率</div>
-              <div class="summary-value">${(discount * 10).toFixed(1)}折 / ${(taxRate * 100).toFixed(2)}%</div>
-            </div>
-          `;
+          summaryHtml += summaryBox('折讓 / 稅率', `${(discount * 10).toFixed(1)}折 / ${(taxRate * 100).toFixed(2)}%`);
         }
       }
 
-      const summaryGrid = document.getElementById('summaryGrid');
       summaryGrid.innerHTML = summaryHtml;
       summaryGrid.style.display = summaryHtml.trim() === '' ? 'none' : 'grid';
     }
 
-    function showDiag(text){
+    // ================= 行情 =================
+
+    function showDiag(text) {
       const box = document.getElementById('diagBox');
-      if(!box) return;
+      if (!box) return;
       box.style.display = 'block';
       box.textContent = text;
     }
-    function clearDiag(){
+    function clearDiag() {
       const box = document.getElementById('diagBox');
-      if(!box) return;
+      if (!box) return;
       box.style.display = 'none';
       box.textContent = '';
     }
@@ -1682,76 +1809,98 @@
       const sym = symbol.trim().toUpperCase();
       if (!sym) return null;
 
-      const workerUrl = `https://twse-proxy.yijhuang8931.workers.dev?sym=${sym}`;
+      // 逾時用 Promise.race 處理，不傳 signal 給 fetch（部分預覽環境無法轉送 AbortSignal）
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('連線逾時（超過 8 秒沒有回應）')), 8000);
+      });
 
       try {
-        const res = await fetch(workerUrl, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data = await res.json();
-        let meta = null;
-        if (data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
-          meta = data.quoteResponse.result[0];
-        } else if (data.chart && data.chart.result && data.chart.result.length > 0) {
-          meta = data.chart.result[0].meta;
+        const res = await Promise.race([
+          fetch(`${WORKER_URL}?sym=${encodeURIComponent(sym)}`, { cache: 'no-store' }),
+          timeout
+        ]);
+        let raw;
+        try {
+          raw = await res.json();
+        } catch (_) {
+          throw new Error(`Worker 回傳的不是 JSON (HTTP ${res.status})`);
         }
+        if (!res.ok || raw.error) throw new Error(raw.error || `HTTP ${res.status}`);
 
-        if (!meta) throw new Error('查無此股票資料');
+        const d = normalizeQuote(raw, sym);
+        if (!d) throw new Error('Worker 回傳格式無法辨識，請確認已部署新版 worker.js');
 
-        clearDiag();
-        const name = meta.shortName || meta.symbol || sym;
-        
-        const currentPrice = (meta.regularMarketClose !== undefined && meta.regularMarketClose !== 0)
-          ? meta.regularMarketClose
-          : (meta.regularMarketPrice !== undefined && meta.regularMarketPrice !== 0 ? meta.regularMarketPrice : (meta.previousClose || 0));
-
-        const prevClose = meta.regularMarketPreviousClose || meta.previousClose || currentPrice;
-        const openPrice = (meta.regularMarketOpen !== undefined && meta.regularMarketOpen !== 0) 
-          ? meta.regularMarketOpen 
-          : prevClose;
-
+        const currentPrice = d.price || d.prevClose || 0;
+        if (!currentPrice) throw new Error('有回傳資料但沒有價格，可能是代號錯誤');
+        const prevClose = d.prevClose || currentPrice;
         const diff = currentPrice - prevClose;
-        const diffPercent = prevClose > 0 ? (diff / prevClose * 100) : 0;
-        const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-
-        let tick = getTickSize(currentPrice);
-        let bids = [];
-        let asks = [];
-        for (let i = 1; i <= 5; i++) {
-          bids.push({ price: Math.round((currentPrice - i * tick) * 100) / 100, vol: Math.floor(Math.random() * 50) + 10 });
-          asks.push({ price: Math.round((currentPrice + i * tick) * 100) / 100, vol: Math.floor(Math.random() * 50) + 10 });
-        }
 
         return {
           symbol: sym,
-          name,
+          name: d.name || sym,
           currentPrice,
-          openPrice,
+          openPrice: d.open || null,
           prevClose,
+          limitUp: d.limitUp || null,
+          limitDown: d.limitDown || null,
           diff,
-          diffPercent,
-          time,
-          bids,
-          asks
+          diffPercent: prevClose > 0 ? (diff / prevClose * 100) : 0,
+          time: new Date(d.time || Date.now()).toLocaleTimeString('zh-TW', { hour12: false }),
+          bids: d.bids || [],
+          asks: d.asks || [],
+          source: d.source || 'unknown'
         };
       } catch (e) {
-        showDiag(`查詢失敗：${e.message}`);
+        const msg = e.name === 'AbortError' ? '連線逾時（超過 8 秒沒有回應）' : e.message;
+        showDiag(`查詢 ${sym} 失敗：${msg}`);
         return null;
+      } finally {
+        clearTimeout(timer);
       }
     }
 
+    // 同時支援新版 Worker（統一格式）與舊版 Worker（Yahoo 原始格式）
+    function normalizeQuote(d, sym) {
+      if (d && d.source && (d.price || d.prevClose)) return d;
+
+      const r = d && d.chart && d.chart.result && d.chart.result[0];
+      if (r) {
+        const m = r.meta || {};
+        const q = (r.indicators && r.indicators.quote && r.indicators.quote[0]) || {};
+        const open = Array.isArray(q.open) ? (q.open.find(v => v != null) ?? null) : null;
+        return {
+          source: 'yahoo',
+          name: m.shortName || m.longName || sym,
+          price: m.regularMarketPrice || null,
+          open,
+          prevClose: m.previousClose || m.chartPreviousClose || null,
+          limitUp: null,
+          limitDown: null,
+          time: m.regularMarketTime ? m.regularMarketTime * 1000 : Date.now(),
+          bids: [],
+          asks: []
+        };
+      }
+      return null;
+    }
+
+    let fetchSeq = 0;
+
     async function fetchLiveQuote(isManual = false) {
       const now = Date.now();
-      if (isFetching || (isManual && now - lastFetchTime < 1000)) return;
+      if (!isManual && isFetching) return;                 // 自動更新才讓路，手動同步一律執行
+      if (isManual && now - lastFetchTime < 800) return;
       lastFetchTime = now;
+      const seq = ++fetchSeq;
 
-      const input = document.getElementById('quoteSymbolInput');
-      const symbol = input.value.trim().toUpperCase();
+      const tabIndex = currentTab;
+      const symbol = document.getElementById('quoteSymbolInput').value.trim().toUpperCase();
 
       if (!symbol) {
         if (isManual) alert('請先輸入台股股票代號（例如 2330 或 1815）');
-        tabsData[currentTab].symbol = '';
-        tabsData[currentTab].quote = null;
+        tabsData[tabIndex].symbol = '';
+        tabsData[tabIndex].quote = null;
         renderQuoteBanner(null);
         restartAutoRefresh();
         saveState();
@@ -1769,28 +1918,28 @@
 
       try {
         const quoteObj = await queryLiveStockData(symbol);
+        if (seq !== fetchSeq) return;                      // 已有更新的請求，丟掉舊結果
         if (!quoteObj) throw new Error('查無此股票資料');
 
-        tabsData[currentTab].symbol = symbol;
-        tabsData[currentTab].name = `${symbol} ${quoteObj.name}`;
-        tabsData[currentTab].quote = quoteObj;
+        const tab = tabsData[tabIndex];
+        tab.symbol = symbol;
+        tab.name = `${symbol} ${quoteObj.name}`;
+        tab.quote = quoteObj;
 
-        if (isManual && tabsData[currentTab].orders.length > 0 && quoteObj.currentPrice > 0) {
-          tabsData[currentTab].orders[0].price = quoteObj.currentPrice;
+        if (tabIndex === currentTab && currentMode !== 'inventory') {
+          clearDiag();
+          renderTabs();
+          updateTabSettingLabels();
+          renderQuoteBanner(quoteObj);
+          renderTable();      // 不重畫下單列，避免自動更新時打斷輸入
         }
-
-        renderTabs();
-        updateTabSettingLabels();
-        renderQuoteBanner(quoteObj);
-        renderOrderRows();
-        renderTable();
         saveState();
-
+        if (isManual) restartAutoRefresh();
       } catch (err) {
         console.error(err);
-        if (isManual) alert('抓取即時行情失敗，詳細記錄已顯示在畫面上。');
+        if (isManual) alert('抓取行情失敗，詳細原因已顯示在畫面上。');
       } finally {
-        isFetching = false;
+        if (seq === fetchSeq) isFetching = false;
         if (isManual) {
           btn.disabled = false;
           btn.innerText = '同步';
@@ -1800,12 +1949,11 @@
 
     function clearQuoteInput() {
       document.getElementById('quoteSymbolInput').value = '';
-      tabsData[currentTab].symbol = '';
-      tabsData[currentTab].quote = null;
-      tabsData[currentTab].name = `標的 ${currentTab + 1}`;
-      if (tabsData[currentTab].orders.length > 0) {
-        tabsData[currentTab].orders[0].price = null;
-      }
+      const tab = tabsData[currentTab];
+      tab.symbol = '';
+      tab.quote = null;
+      tab.name = `標的 ${currentTab + 1}`;
+      tab.orders = [{ price: null, qty: tab.orders[0] ? tab.orders[0].qty : 1 }];
       clearDiag();
       renderTabs();
       updateTabSettingLabels();
@@ -1836,21 +1984,23 @@
       }
 
       box.style.display = 'flex';
-      document.getElementById('quoteStockName').innerText = `${q.name} (${q.symbol}) ${q.currentPrice.toFixed(2)}`;
-      
-      const diffEl = document.getElementById('quotePriceDiff');
-      const isUp = q.diff > 0;
-      const isDown = q.diff < 0;
-      const sign = isUp ? '+' : '';
-      const color = isUp ? 'var(--profit)' : (isDown ? 'var(--loss)' : 'var(--text-muted)');
-      
-      diffEl.style.color = color;
-      diffEl.innerText = `${sign}${q.diff.toFixed(2)} (${sign}${q.diffPercent.toFixed(2)}%)`;
-      
-      liveDot.style.display = autoRefresh ? 'inline-block' : 'none';
-      document.getElementById('quoteTimeText').innerText = `${q.time}`;
+      const nameEl = document.getElementById('quoteStockName');
+      nameEl.innerHTML = `${escapeHtml(q.name)} (${escapeHtml(q.symbol)}) <span class="${priceClass(q.currentPrice, q.prevClose)}">${q.currentPrice.toFixed(2)}</span>`;
 
-      if (showFiveOrder && q.bids && q.asks && q.bids.length > 0) {
+      const diffEl = document.getElementById('quotePriceDiff');
+      const sign = q.diff > 0 ? '+' : '';
+      diffEl.style.color = q.diff > 0 ? 'var(--profit)' : (q.diff < 0 ? 'var(--loss)' : 'var(--text-muted)');
+      diffEl.innerText = `${sign}${q.diff.toFixed(2)} (${sign}${q.diffPercent.toFixed(2)}%)`;
+
+      const open = isMarketOpen();
+      liveDot.style.display = (autoRefresh && open) ? 'inline-block' : 'none';
+      let timeText = q.time;
+      if (!open) timeText += ' 收盤';
+      if (q.source === 'yahoo') timeText += ' (Yahoo)';
+      document.getElementById('quoteTimeText').innerText = timeText;
+
+      const hasBook = (q.bids && q.bids.length > 0) || (q.asks && q.asks.length > 0);
+      if (showFiveOrder && hasBook) {
         fiveCard.style.display = 'block';
         const tbody = document.getElementById('fiveOrderBody');
         tbody.innerHTML = '';
@@ -1859,18 +2009,13 @@
           const bid = q.bids[i] || { price: null, vol: null };
           const ask = q.asks[i] || { price: null, vol: null };
 
-          const bidPriceText = bid.price ? bid.price.toFixed(2) : '-';
-          const bidVolText = bid.vol !== null ? bid.vol : '-';
-          const askPriceText = ask.price ? ask.price.toFixed(2) : '-';
-          const askVolText = ask.vol !== null ? ask.vol : '-';
-
           const tr = document.createElement('tr');
           tr.innerHTML = `
-            <td class="five-bid-vol">${bidVolText}</td>
-            <td class="five-bid-price ${bid.price ? 'order-clickable' : ''}" onclick="setOrderPriceDirect(${bid.price})">${bidPriceText}</td>
+            <td class="five-bid-vol">${bid.vol !== null ? bid.vol : '-'}</td>
+            <td class="five-bid-price ${priceClass(bid.price, q.prevClose)} ${bid.price ? 'order-clickable' : ''}" onclick="setOrderPriceDirect(${bid.price})">${bid.price ? bid.price.toFixed(2) : '-'}</td>
             <td style="width:12px; text-align:center; color:#38383a;">|</td>
-            <td class="five-ask-price ${ask.price ? 'order-clickable' : ''}" onclick="setOrderPriceDirect(${ask.price})">${askPriceText}</td>
-            <td class="five-ask-vol">${askVolText}</td>
+            <td class="five-ask-price ${priceClass(ask.price, q.prevClose)} ${ask.price ? 'order-clickable' : ''}" onclick="setOrderPriceDirect(${ask.price})">${ask.price ? ask.price.toFixed(2) : '-'}</td>
+            <td class="five-ask-vol">${ask.vol !== null ? ask.vol : '-'}</td>
           `;
           tbody.appendChild(tr);
         }
@@ -1879,21 +2024,21 @@
       }
     }
 
+    // ================= 庫存 =================
+
     function addInventoryStock() {
-      const newStock = {
+      inventoryData.push({
         id: 'inv_' + Date.now(),
         symbol: '',
         name: '自訂持股',
         type: 'swing',
         unit: 'lot',
         currentPrice: null,
+        prevClose: null,
         diff: 0,
         diffPercent: 0,
-        orders: [
-          { price: null, qty: 1 }
-        ]
-      };
-      inventoryData.push(newStock);
+        orders: [{ price: null, qty: 1 }]
+      });
       renderInventoryList();
       saveState();
     }
@@ -1935,13 +2080,15 @@
     }
 
     function updateInvField(invIndex, key, val) {
-      inventoryData[invIndex][key] = val;
+      const inv = inventoryData[invIndex];
+      inv[key] = val;
       if (key === 'symbol') {
         const sym = val.trim().toUpperCase();
-        inventoryData[invIndex].symbol = sym;
+        inv.symbol = sym;
         if (!sym) {
-          inventoryData[invIndex].name = '自訂持股';
-          inventoryData[invIndex].currentPrice = null;
+          inv.name = '自訂持股';
+          inv.currentPrice = null;
+          inv.prevClose = null;
         }
       }
       renderInventoryList();
@@ -1949,8 +2096,7 @@
     }
 
     function updateInvCurrentPrice(invIndex, val) {
-      const inv = inventoryData[invIndex];
-      inv.currentPrice = val.trim() === '' ? null : parseFloat(val);
+      inventoryData[invIndex].currentPrice = val.trim() === '' ? null : parseFloat(val);
       updateSingleCardStats(invIndex);
       recalculateInventorySummary();
       saveState();
@@ -1962,7 +2108,7 @@
       let invTotalBuyCost = 0;
       let hasValidBuyPrice = false;
 
-      const taxRate = inv.type === 'warrant' ? 0.001 : 0.003;
+      const taxRate = (inv.type === 'warrant' || isETF(inv.symbol)) ? 0.001 : 0.003;
       const isOdd = inv.unit === 'odd';
 
       inv.orders.forEach(ord => {
@@ -1970,10 +2116,9 @@
           hasValidBuyPrice = true;
           const shares = isOdd ? Math.round(ord.qty) : Math.round(ord.qty * 1000);
           const amt = ord.price * shares;
-          const fee = Math.max(minFeeLimit, Math.floor(amt * 0.001425 * currentDiscount));
           invTotalBuyAmt += amt;
           invTotalShares += shares;
-          invTotalBuyCost += (amt + fee);
+          invTotalBuyCost += amt + calcFee(amt, invDiscount);
         }
       });
 
@@ -1986,79 +2131,68 @@
 
       if (hasValidBuyPrice && curPrice > 0 && invTotalShares > 0) {
         marketVal = curPrice * invTotalShares;
-        const sellFee = Math.max(minFeeLimit, Math.floor(marketVal * 0.001425));
+        const sellFee = calcFee(marketVal, invDiscount);
         const sellTax = Math.floor(marketVal * taxRate);
-        const netSellAmt = marketVal - sellFee - sellTax;
-        netProfit = netSellAmt - invTotalBuyCost;
+        netProfit = Math.round(marketVal - sellFee - sellTax - invTotalBuyCost);
         roi = ((netProfit / invTotalBuyCost) * 100).toFixed(2);
       }
 
-      return {
-        hasValidBuyPrice,
-        invTotalShares,
-        invTotalBuyCost,
-        avgBuyPrice,
-        curPrice,
-        marketVal,
-        netProfit,
-        roi
-      };
+      return { hasValidBuyPrice, invTotalShares, invTotalBuyCost: Math.round(invTotalBuyCost), avgBuyPrice, curPrice, marketVal, netProfit, roi };
+    }
+
+    function pnlText(res) {
+      if (!(res.curPrice > 0 && res.hasValidBuyPrice)) return '--';
+      return `${signed(res.netProfit)} (${res.netProfit > 0 ? '+' : ''}${res.roi}%)`;
+    }
+
+    function pnlColor(n) {
+      return n > 0 ? 'var(--profit)' : (n < 0 ? 'var(--loss)' : 'var(--text-muted)');
     }
 
     function updateSingleCardStats(invIndex) {
-      const inv = inventoryData[invIndex];
-      const res = calculateInventoryPnl(inv);
-
-      const isProfit = res.netProfit > 0;
-      const isLoss = res.netProfit < 0;
-      const profitSign = isProfit ? '+' : '';
-      const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
-
+      const res = calculateInventoryPnl(inventoryData[invIndex]);
       const avgEl = document.getElementById(`inv-avg-${invIndex}`);
       const pnlEl = document.getElementById(`inv-pnl-${invIndex}`);
-
-      if (avgEl) {
-        avgEl.innerText = res.avgBuyPrice > 0 ? `${res.avgBuyPrice.toFixed(2)} (${res.invTotalShares}股)` : '--';
-      }
+      if (avgEl) avgEl.innerText = res.avgBuyPrice > 0 ? `${res.avgBuyPrice.toFixed(2)} (${res.invTotalShares}股)` : '--';
       if (pnlEl) {
-        pnlEl.style.color = profitColor;
-        pnlEl.innerText = (res.curPrice > 0 && res.hasValidBuyPrice) ? `${profitSign}${res.netProfit.toLocaleString()} (${profitSign}${res.roi}%)` : '--';
+        pnlEl.style.color = pnlColor(res.netProfit);
+        pnlEl.innerText = pnlText(res);
       }
     }
 
     async function syncAllInventory() {
+      if (isSyncingInv) return;
+      isSyncingInv = true;
       const btn = document.getElementById('syncAllInvBtn');
       if (btn) {
         btn.disabled = true;
         btn.innerText = '同步中...';
       }
 
-      for (let i = 0; i < inventoryData.length; i++) {
-        const inv = inventoryData[i];
-        if (inv.symbol && inv.symbol.trim() !== '') {
-          try {
-            const q = await queryLiveStockData(inv.symbol);
-            if (q) {
-              inv.name = `${q.symbol} ${q.name}`;
-              inv.currentPrice = q.currentPrice;
-              inv.diff = q.diff;
-              inv.diffPercent = q.diffPercent;
-            }
-          } catch (e) {
-            console.error(e);
+      const targets = inventoryData.filter(inv => inv.symbol && inv.symbol.trim() !== '');
+      // 每次 3 檔並行，避免一次打太多被限流
+      for (let i = 0; i < targets.length; i += 3) {
+        await Promise.all(targets.slice(i, i + 3).map(async inv => {
+          const q = await queryLiveStockData(inv.symbol);
+          if (q) {
+            inv.name = `${q.symbol} ${q.name}`;
+            inv.currentPrice = q.currentPrice;
+            inv.prevClose = q.prevClose;
+            inv.diff = q.diff;
+            inv.diffPercent = q.diffPercent;
           }
-        }
+        }));
       }
 
-      if (currentMode === 'inventory') {
-        renderInventoryList();
-      }
+      lastInvSyncTime = Date.now();
+      if (currentMode === 'inventory') renderInventoryList();
       saveState();
 
       if (btn) {
         btn.disabled = false;
         btn.innerText = '一鍵同步全部持股現價';
       }
+      isSyncingInv = false;
     }
 
     function recalculateInventorySummary() {
@@ -2076,16 +2210,13 @@
       });
 
       const totalRoi = totalInvestCost > 0 ? ((totalNetProfit / totalInvestCost) * 100).toFixed(2) : '0.00';
-      const isTotalProfit = totalNetProfit > 0;
-      const isTotalLoss = totalNetProfit < 0;
-      const totalSign = isTotalProfit ? '+' : '';
-      const totalProfitColor = isTotalProfit ? 'var(--profit)' : (isTotalLoss ? 'var(--loss)' : 'var(--text)');
+      const color = totalNetProfit > 0 ? 'var(--profit)' : (totalNetProfit < 0 ? 'var(--loss)' : 'var(--text)');
 
       const summaryEl = document.getElementById('invTotalSummary');
       if (!summaryEl) return;
       summaryEl.innerHTML = `
         <div class="summary-box">
-          <div class="summary-title">總投入資金 (含規費)</div>
+          <div class="summary-title">總投入資金 (含手續費)</div>
           <div class="summary-value">${totalInvestCost > 0 ? totalInvestCost.toLocaleString() + ' 元' : '--'}</div>
         </div>
         <div class="summary-box">
@@ -2093,12 +2224,12 @@
           <div class="summary-value">${totalMarketValue > 0 ? Math.round(totalMarketValue).toLocaleString() + ' 元' : '--'}</div>
         </div>
         <div class="summary-box">
-          <div class="summary-title">總未實現損益</div>
-          <div class="summary-value" style="color:${totalProfitColor};">${totalInvestCost > 0 ? `${totalSign}${totalNetProfit.toLocaleString()} 元` : '--'}</div>
+          <div class="summary-title">總未實現損益 (扣賣出規費)</div>
+          <div class="summary-value" style="color:${color};">${totalInvestCost > 0 ? `${signed(totalNetProfit)} 元` : '--'}</div>
         </div>
         <div class="summary-box">
           <div class="summary-title">總整體報酬率</div>
-          <div class="summary-value" style="color:${totalProfitColor};">${totalInvestCost > 0 ? `${totalSign}${totalRoi}%` : '--'}</div>
+          <div class="summary-value" style="color:${color};">${totalInvestCost > 0 ? `${totalNetProfit > 0 ? '+' : ''}${totalRoi}%` : '--'}</div>
         </div>
       `;
     }
@@ -2109,24 +2240,22 @@
       container.innerHTML = '';
 
       inventoryData.forEach((inv, invIdx) => {
+        if (!Array.isArray(inv.orders) || inv.orders.length === 0) inv.orders = [{ price: null, qty: 1 }];
         const res = calculateInventoryPnl(inv);
         const isOdd = inv.unit === 'odd';
         const qtyLabel = isOdd ? '股數' : '張數';
-
-        const isProfit = res.netProfit > 0;
-        const isLoss = res.netProfit < 0;
-        const profitSign = isProfit ? '+' : '';
-        const profitColor = isProfit ? 'var(--profit)' : (isLoss ? 'var(--loss)' : 'var(--text-muted)');
         const curPriceVal = (inv.currentPrice !== null && inv.currentPrice !== undefined) ? inv.currentPrice : '';
 
-        const card = document.createElement('div');
-        card.className = 'inventory-item-card';
+        let changeHtml = '';
+        if (inv.currentPrice > 0 && inv.prevClose > 0) {
+          const s = inv.diff > 0 ? '+' : '';
+          changeHtml = `<span class="${priceClass(inv.currentPrice, inv.prevClose)}" style="font-size:0.75rem; font-weight:700;">${s}${(inv.diff || 0).toFixed(2)} (${s}${(inv.diffPercent || 0).toFixed(2)}%)</span>`;
+        }
 
         let ordersHtml = '';
         inv.orders.forEach((ord, ordIdx) => {
           const pVal = (ord.price !== null && ord.price !== undefined) ? ord.price : '';
           const qVal = (ord.qty !== null && ord.qty !== undefined) ? ord.qty : (isOdd ? 1000 : 1);
-
           ordersHtml += `
             <div class="order-row" style="margin-bottom:6px;">
               <span class="order-tag">#${ordIdx + 1}</span>
@@ -2137,23 +2266,28 @@
           `;
         });
 
+        const typeLabel = inv.type === 'warrant' ? '權證' : (isETF(inv.symbol) ? 'ETF' : '波段');
+
+        const card = document.createElement('div');
+        card.className = 'inventory-item-card';
         card.innerHTML = `
           <div class="inventory-header">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span class="inv-type-pill">${inv.type === 'warrant' ? '權證' : '波段'}</span>
-              <span style="font-weight:700; font-size:0.95rem;">${inv.name || '自訂持股'}</span>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <span class="inv-type-pill">${typeLabel}</span>
+              <span style="font-weight:700; font-size:0.95rem;">${escapeHtml(inv.name || '自訂持股')}</span>
+              ${changeHtml}
             </div>
             <button type="button" class="order-del-btn" style="background:transparent; color:var(--text-muted); font-size:1.1rem;" onclick="deleteInventoryStock(${invIdx})" title="刪除持股">✕</button>
           </div>
 
           <div style="display:flex; gap:6px; margin-bottom:8px;">
-            <input type="text" class="quote-input" placeholder="代號 Ex. 2330" value="${inv.symbol || ''}" style="flex:1;" onchange="updateInvField(${invIdx}, 'symbol', this.value.toUpperCase())">
+            <input type="text" class="quote-input" placeholder="代號 Ex. 2330" value="${escapeHtml(inv.symbol || '')}" style="flex:1;" onchange="updateInvField(${invIdx}, 'symbol', this.value.toUpperCase())">
             <select class="input-control" style="width:72px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'type', this.value)">
-              <option value="swing" ${inv.type === 'swing' ? 'selected' : ''}>波段</option>
+              <option value="swing" ${inv.type !== 'warrant' ? 'selected' : ''}>股票</option>
               <option value="warrant" ${inv.type === 'warrant' ? 'selected' : ''}>權證</option>
             </select>
             <select class="input-control" style="width:72px; text-align-last:center; padding-right:8px;" onchange="updateInvField(${invIdx}, 'unit', this.value)">
-              <option value="lot" ${inv.unit === 'lot' ? 'selected' : ''}>整張</option>
+              <option value="lot" ${inv.unit !== 'odd' ? 'selected' : ''}>整張</option>
               <option value="odd" ${inv.unit === 'odd' ? 'selected' : ''}>零股</option>
             </select>
           </div>
@@ -2165,13 +2299,11 @@
             </div>
             <div>
               <div class="inv-stat-label">買進均價 / 股數</div>
-              <div class="inv-stat-val" id="inv-avg-${invIdx}">${res.avgBuyPrice > 0 ? res.avgBuyPrice.toFixed(2) : '--'} (${res.invTotalShares}股)</div>
+              <div class="inv-stat-val" id="inv-avg-${invIdx}">${res.avgBuyPrice > 0 ? `${res.avgBuyPrice.toFixed(2)} (${res.invTotalShares}股)` : '--'}</div>
             </div>
             <div>
               <div class="inv-stat-label">損益 (報酬率)</div>
-              <div class="inv-stat-val" id="inv-pnl-${invIdx}" style="color:${profitColor};">
-                ${(res.curPrice > 0 && res.hasValidBuyPrice) ? `${profitSign}${res.netProfit.toLocaleString()} (${profitSign}${res.roi}%)` : '--'}
-              </div>
+              <div class="inv-stat-val" id="inv-pnl-${invIdx}" style="color:${pnlColor(res.netProfit)};">${pnlText(res)}</div>
             </div>
           </div>
 
@@ -2187,6 +2319,8 @@
       recalculateInventorySummary();
     }
 
+    // ================= 自動更新 =================
+
     function restartAutoRefresh() {
       if (refreshTimer) {
         clearInterval(refreshTimer);
@@ -2194,14 +2328,12 @@
       }
       if (!autoRefresh) return;
 
-      const symbol = tabsData[currentTab].symbol;
-      if (symbol && symbol.trim() !== '') {
-        refreshTimer = setInterval(() => {
-          if (tabsData[currentTab].symbol && !document.hidden && currentMode !== 'inventory') {
-            fetchLiveQuote(false);
-          }
-        }, refreshInterval);
-      }
+      refreshTimer = setInterval(() => {
+        if (document.hidden || !isMarketOpen()) return;
+        if (currentMode !== 'inventory' && tabsData[currentTab].symbol) {
+          fetchLiveQuote(false);
+        }
+      }, refreshInterval);
     }
 
     function openSettings() {
@@ -2222,8 +2354,8 @@
         currentTab = 0;
         currentMode = 'daytrade';
         enabledTabs = [true, true, true];
+        syncDisplayTogglesUI();
         saveState();
-        renderTabs();
         syncUIFromCurrentTab();
         restartAutoRefresh();
         closeSettings();
@@ -2248,34 +2380,29 @@
         tabsData[currentTab].symbol = '';
         tabsData[currentTab].quote = null;
         renderQuoteBanner(null);
-        restartAutoRefresh();
         renderTable();
         saveState();
       }
     });
 
     document.getElementById('quoteSymbolInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        fetchLiveQuote(true);
-        restartAutoRefresh();
-      }
+      if (e.key === 'Enter') fetchLiveQuote(true);
     });
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        if (autoRefresh && currentMode !== 'inventory' && tabsData[currentTab].symbol) {
-          fetchLiveQuote(false);
-        }
-        if (currentMode === 'inventory') {
-          syncAllInventory();
-        }
+      if (document.hidden) return;
+      if (currentMode === 'inventory') {
+        if (Date.now() - lastInvSyncTime > 30000) syncAllInventory();
+      } else if (tabsData[currentTab].symbol) {
+        fetchLiveQuote(false);
       }
     });
 
+    // ================= 啟動 =================
     loadState();
-    renderTabs();
-    handleTabClick(currentTab);
     startLiveClock();
+    handleTabClick(currentTab);
+    if (currentMode === 'inventory') syncAllInventory();
   </script>
 </body>
 </html>
